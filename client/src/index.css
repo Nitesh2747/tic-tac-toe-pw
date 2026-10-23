@@ -1,0 +1,788 @@
+/* ---------- theme tokens ----------
+   Every colour in this file comes from a variable below. The dark theme just
+   redefines the same variables, so nothing else needs to know about themes.
+   The data-theme attribute on <html> is set by the script in index.html
+   (before first paint) and by the useTheme hook. */
+:root {
+  color-scheme: light;
+  --paper: #eef2f1;
+  --grid: #d3dcda;
+  --ink: #1f2a37;
+  --ink-soft: #5b6877;
+  --x: #2f4bd8;
+  --o: #d4572f;
+  --win: #fff3b8;
+  --cell: #fbfcfc;
+  --cell-hover: #ffffff;
+  --board: #1f2a37;
+  --edge: #c3cdcb; /* quiet borders; your own scoreboard cell uses --ink to stand out */
+  --on-ink: #ffffff; /* text on a filled --ink button */
+  --ink-hover: #111a24; /* filled button on hover */
+  --ok: #1f7a4d;
+  --danger: #b83f1a;
+  --avatar-bg-l: 92%; /* avatar background / pattern lightness */
+  --avatar-fg-l: 33%;
+  --radius: 14px;
+  font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  color: var(--ink);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #10151b;
+  --grid: #1a222b;
+  --ink: #e8edf2;
+  --ink-soft: #a3b0bd;
+  --x: #8ea2ff;
+  --o: #ff8f66;
+  --win: #4a4120;
+  --cell: #1b232d;
+  --cell-hover: #242f3b;
+  --board: #627386;
+  --edge: #3a4756;
+  --on-ink: #10151b;
+  --ink-hover: #ffffff;
+  --ok: #5fd39a;
+  --danger: #ff9a7a;
+  --avatar-bg-l: 20%;
+  --avatar-fg-l: 72%;
+}
+
+/* Fit everything on one screen: the board shrinks with the window height.
+   --reserve is the height the rest of the game screen needs (title, room info,
+   scoreboard, status, buttons). Rooms that show more (a private room's code line,
+   a host's Kick button, which can wrap the buttons onto a second row) say so with
+   the modifiers below, so only they give up some board. The board never grows
+   past 360px or shrinks below 220px. */
+:root {
+  --reserve: 21rem;
+}
+
+.game {
+  --board-size: min(92vw, 360px);
+}
+
+@supports (height: 100svh) {
+  .game {
+    --board-size: clamp(220px, min(92vw, 360px, calc(100svh - var(--reserve))), 360px);
+  }
+}
+
+.game--code {
+  --reserve: 23rem; /* + the code line */
+}
+
+.game--crowded {
+  --reserve: 24rem; /* + a second row of buttons */
+}
+
+.game--code.game--crowded {
+  --reserve: 26.2rem;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: var(--paper);
+  /* graph-paper grid */
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(1.5rem, 4.5vw, 2rem);
+  letter-spacing: 0.01em;
+}
+
+.game {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.status {
+  margin: 0;
+  max-width: min(92vw, 420px);
+  text-align: center;
+  min-height: 1.25em;
+  line-height: 1.25;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.status--won {
+  color: var(--ink);
+}
+
+.status--error {
+  color: var(--danger);
+}
+
+/* A player's name inside a status sentence: cut to a fixed width with an ellipsis. */
+.status__name {
+  display: inline-block;
+  max-width: 8em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+/* ---------- board ---------- */
+
+.board {
+  position: relative; /* the win-line SVG is positioned against this */
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 8px;
+  width: var(--board-size);
+  background: var(--board);
+  border-radius: calc(var(--radius) + 6px);
+}
+
+.square {
+  aspect-ratio: 1;
+  font: inherit;
+  font-size: clamp(2.4rem, 12vw, 3.6rem);
+  font-weight: 800;
+  line-height: 1;
+  color: var(--ink);
+  background: var(--cell);
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background-color 0.12s ease, transform 0.12s ease;
+}
+
+.square:hover:not(:disabled) {
+  background: var(--cell-hover);
+  transform: translateY(-2px);
+}
+
+.square:disabled {
+  cursor: default;
+}
+
+.square--x {
+  color: var(--x);
+}
+
+.square--o {
+  color: var(--o);
+}
+
+.square--winning {
+  background: var(--win);
+}
+
+/* The line drawn through the three winning tiles. */
+.board__line {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* never block clicks on the squares underneath */
+}
+
+.board__line--x {
+  color: var(--x);
+}
+
+.board__line--o {
+  color: var(--o);
+}
+
+.board__line line {
+  stroke: currentColor;
+  stroke-width: 9;
+  stroke-linecap: round;
+  /* Draw-in animation: the dash is as long as the line and starts shifted out of view. */
+  stroke-dasharray: var(--len);
+  stroke-dashoffset: var(--len);
+  animation: draw-line 0.45s ease-out 0.15s forwards;
+}
+
+@keyframes draw-line {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* ---------- buttons ---------- */
+
+.square:focus-visible,
+.reset:focus-visible {
+  outline: 3px solid var(--x);
+  outline-offset: 2px;
+}
+
+.reset {
+  font: inherit;
+  font-weight: 700;
+  padding: 0.5rem 1.2rem;
+  color: var(--ink);
+  background: var(--cell);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.reset:hover {
+  background: var(--cell-hover);
+}
+
+.reset--highlight {
+  color: var(--on-ink);
+  background: var(--ink);
+}
+
+.reset--highlight:hover {
+  background: var(--ink-hover);
+}
+
+.reset:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.link-button {
+  font: inherit;
+  padding: 0.25rem;
+  color: var(--ink-soft);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  color: var(--ink);
+}
+
+.link-button:focus-visible {
+  outline: 3px solid var(--x);
+  outline-offset: 2px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6rem;
+}
+
+/* ---------- theme toggle ---------- */
+
+.theme-toggle {
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  right: 12px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  color: var(--ink);
+  background: var(--cell);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  background: var(--cell-hover);
+}
+
+.theme-toggle:focus-visible {
+  outline: 3px solid var(--x);
+  outline-offset: 2px;
+}
+
+/* ---------- avatars ---------- */
+
+.avatar {
+  display: block;
+  flex: none;
+  border-radius: 28%;
+  overflow: hidden;
+}
+
+/* --h (the hue) is set per avatar; the lightness comes from the theme tokens. */
+.avatar__bg {
+  fill: hsl(var(--h) 45% var(--avatar-bg-l));
+}
+
+.avatar__cell {
+  fill: hsl(var(--h) 70% var(--avatar-fg-l));
+}
+
+.avatar--away {
+  opacity: 0.4;
+}
+
+.avatar--empty {
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  color: var(--ink-soft);
+  border: 2px dashed var(--ink-soft);
+}
+
+/* ---------- scoreboard ---------- */
+
+.scoreboard {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  width: var(--board-size);
+}
+
+.scoreboard__cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 0; /* lets long names shrink instead of widening the grid */
+  padding: 0.25rem 0.4rem;
+  color: var(--ink);
+  background: var(--cell);
+  border: 2px solid var(--edge);
+  border-radius: var(--radius);
+}
+
+.scoreboard__cell--you {
+  border-color: var(--ink);
+}
+
+.scoreboard__top {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 22px;
+}
+
+.scoreboard__value {
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.scoreboard__cell--x .scoreboard__value,
+.scoreboard__cell--x .scoreboard__mark {
+  color: var(--x);
+}
+
+.scoreboard__cell--o .scoreboard__value,
+.scoreboard__cell--o .scoreboard__mark {
+  color: var(--o);
+}
+
+.scoreboard__name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--ink-soft);
+}
+
+.scoreboard__mark {
+  margin-right: 0.3em;
+  font-weight: 800;
+}
+
+/* ---------- profile ---------- */
+
+.text-input {
+  width: 100%;
+  font: inherit;
+  font-weight: 700;
+  padding: 0.5rem 0.8rem;
+  text-align: center;
+  color: var(--ink);
+  background: var(--cell);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+}
+
+.text-input:focus-visible {
+  outline: 3px solid var(--x);
+  outline-offset: 2px;
+}
+
+.text-input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  width: min(92vw, 300px);
+}
+
+.profile-form__avatar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.profile-form__label {
+  font-weight: 700;
+}
+
+.profile-form__hint {
+  margin: 0;
+  min-height: 1.3em;
+  font-size: 0.85rem;
+  text-align: center;
+  color: var(--ink-soft);
+}
+
+.profile-form__hint--error {
+  font-weight: 700;
+  color: var(--danger);
+}
+
+.lobby__who {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  max-width: min(92vw, 420px);
+  margin: 0;
+}
+
+/* min-width: 0 is what lets a flex child shrink below its text, so a long name is cut. */
+.lobby__who-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- online: connection, lobby, room ---------- */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.connection {
+  margin: 0;
+  max-width: min(92vw, 360px);
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+
+.connection--on {
+  color: var(--ok);
+}
+
+.lobby {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  width: min(92vw, 360px);
+}
+
+.lobby__or {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.lobby__join {
+  display: flex;
+  gap: 0.6rem;
+  width: 100%;
+}
+
+.lobby__input {
+  font: inherit;
+  font-weight: 700;
+  flex: 1;
+  min-width: 0;
+  padding: 0.6rem 0.8rem;
+  text-align: center;
+  letter-spacing: 0.15em;
+  color: var(--ink);
+  background: var(--cell);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+}
+
+.lobby__input::placeholder {
+  font-weight: 400;
+  letter-spacing: normal;
+  color: var(--ink-soft);
+}
+
+.lobby__input:focus-visible {
+  outline: 3px solid var(--x);
+  outline-offset: 2px;
+}
+
+.lobby__error {
+  margin: 0;
+  max-width: min(92vw, 360px);
+  text-align: center;
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.room-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  max-width: min(92vw, 420px);
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+}
+
+.room-info__name {
+  min-width: 0;
+  max-width: 11em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.room-info__you {
+  white-space: nowrap;
+}
+
+/* A private room's code, shown only to the players inside it. */
+.room-code {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+
+.room-code__value {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  letter-spacing: 0.2em;
+  color: var(--ink);
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.05rem 0.45rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1.5px solid currentColor;
+  border-radius: 999px;
+}
+
+.badge--public {
+  color: var(--ok);
+}
+
+.badge--private {
+  color: var(--ink);
+}
+
+/* ---------- reduced motion ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .square {
+    transition: none;
+  }
+
+  /* No animation: the line is simply there. */
+  .board__line line {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
+
+/* ---------- lobby: room list, create form ---------- */
+
+.lobby__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  width: 100%;
+}
+
+.lobby__heading {
+  margin: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.lobby__hint {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.lobby__notice {
+  max-width: 100%;
+  margin: 0;
+  padding: 0.35rem 0.75rem;
+  font-weight: 700;
+  text-align: center;
+  color: var(--ink);
+  background: var(--win);
+  border-radius: var(--radius);
+}
+
+/* The list scrolls inside its own box, so the page itself never has to. */
+.room-list {
+  width: 100%;
+  max-height: min(24svh, 190px);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  background: var(--cell);
+  border: 2px solid var(--edge);
+  border-radius: var(--radius);
+}
+
+.room-list__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.5rem 0.3rem 0.75rem;
+  border-bottom: 1px solid var(--edge);
+}
+
+.room-list__row:last-child {
+  border-bottom: none;
+}
+
+.room-list__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+.room-list__meta {
+  font-size: 0.8rem;
+  white-space: nowrap;
+  color: var(--ink-soft);
+}
+
+.room-list__join {
+  padding: 0.2rem 0.8rem;
+  font-size: 0.9rem;
+}
+
+.room-list__empty {
+  width: 100%;
+  margin: 0;
+  padding: 0.7rem;
+  text-align: center;
+  color: var(--ink-soft);
+  border: 2px dashed var(--edge);
+  border-radius: var(--radius);
+}
+
+.create-form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+}
+
+.create-form__choice {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.choice {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: 0.4rem;
+  padding: 0.4rem 0.6rem;
+  background: var(--cell);
+  border: 2px solid var(--edge);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.choice--on {
+  border-color: var(--ink);
+}
+
+.choice:focus-within {
+  outline: 3px solid var(--x);
+  outline-offset: 2px;
+}
+
+.choice input {
+  accent-color: var(--x);
+}
+
+.choice__title {
+  font-weight: 800;
+}
+
+.choice__hint {
+  grid-column: 2;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+
+.reset--danger {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.reset--danger:hover {
+  color: var(--paper);
+  background: var(--danger);
+}
