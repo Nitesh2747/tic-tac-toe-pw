@@ -106,7 +106,7 @@ describe("isValidRoomName", () => {
 
 describe("readRoomSettings", () => {
   it("defaults to a public room called \"<host>'s room\"", () => {
-    expect(readRoomSettings({}, "Ada")).toEqual({ ok: true, name: "Ada's room", visibility: "public" });
+    expect(readRoomSettings({}, "Ada")).toEqual({ ok: true, name: "Ada's room", visibility: "public", turnSeconds: 0 });
     expect(readRoomSettings(null, "Ada").ok).toBe(true);
   });
   it("uses the name and display it is given, cleaning the name", () => {
@@ -114,6 +114,7 @@ describe("readRoomSettings", () => {
       ok: true,
       name: "Friday night",
       visibility: "private",
+      turnSeconds: 0,
     });
   });
   it("falls back to the default for an empty or invisible-characters-only name", () => {
@@ -138,6 +139,28 @@ describe("readRoomSettings", () => {
   });
   it("keeps markup in a room name as plain text", () => {
     expect(readRoomSettings({ roomName: "<b>hi</b>" }, "Ada").name).toBe("<b>hi</b>");
+  });
+});
+
+describe("readRoomSettings: the turn timer", () => {
+  it("is off (0) unless asked for", () => {
+    expect(readRoomSettings({}, "Ada").turnSeconds).toBe(0);
+    expect(readRoomSettings({ turnSeconds: undefined }, "Ada").turnSeconds).toBe(0);
+    expect(readRoomSettings({ turnSeconds: null }, "Ada").turnSeconds).toBe(0);
+  });
+
+  it("accepts exactly the offered lengths: 0, 15 and 30 seconds", () => {
+    for (const ok of [0, 15, 30]) expect(readRoomSettings({ turnSeconds: ok }, "Ada")).toMatchObject({ ok: true, turnSeconds: ok });
+  });
+
+  it("rejects everything else, including numbers in text form", () => {
+    for (const bad of [1, 10, 20, 60, -15, 15.5, "15", "30", "off", NaN, Infinity, {}, [], [15], true]) {
+      expect(readRoomSettings({ turnSeconds: bad }, "Ada")).toEqual({ ok: false, error: "Invalid turn timer" });
+    }
+  });
+
+  it("a bad timer is rejected even when the rest is fine", () => {
+    expect(readRoomSettings({ roomName: "Nice name", visibility: "public", turnSeconds: 99 }, "Ada").ok).toBe(false);
   });
 });
 

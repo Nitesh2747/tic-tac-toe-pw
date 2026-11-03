@@ -1,8 +1,9 @@
-// Counts failures per key (a connection, an IP address) inside a sliding window.
+// Counts events per key (a connection, an IP address, a player) inside a sliding
+// window, and says when a key has used up its allowance.
 //
-// Used for wrong private-room codes. It counts only FAILURES, and callers check
-// it BEFORE looking at the code, so a blocked client learns nothing: even the
-// right code is refused until the block ends.
+// Used for wrong private-room codes (it counts only FAILURES, and callers check it
+// BEFORE looking at the code, so a blocked client learns nothing: even the right
+// code is refused until the block ends) and for chat messages per player.
 export function createFailureLimiter({ limit, windowMs, now = () => Date.now(), maxKeys = 10_000 }) {
   const failures = new Map(); // key -> timestamps of recent failures, oldest first
 
@@ -20,7 +21,7 @@ export function createFailureLimiter({ limit, windowMs, now = () => Date.now(), 
     while (failures.size > maxKeys) failures.delete(failures.keys().next().value);
   }
 
-  return {
+  const limiter = {
     // Milliseconds until this key may try again. 0 means it may try now.
     retryAfterMs(key) {
       const list = recent(key);
@@ -28,11 +29,17 @@ export function createFailureLimiter({ limit, windowMs, now = () => Date.now(), 
       return windowMs - (now() - list[list.length - limit]);
     },
 
-    recordFailure(key) {
+    // Count one event for this key (recordFailure is the same thing, for callers counting failures).
+    record(key) {
       const list = recent(key);
       list.push(now());
       failures.set(key, list);
       if (failures.size > maxKeys) prune();
     },
   };
+  limiter.recordFailure = limiter.record;
+  return limiter;
 }
+
+// The same thing under a name that reads better where it counts successes.
+export const createEventLimiter = createFailureLimiter;

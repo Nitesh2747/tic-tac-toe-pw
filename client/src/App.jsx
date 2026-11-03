@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { socket } from "./game/socket.js";
 import { getPlayerId } from "./game/playerId.js";
 import { loadProfile } from "./game/profile.js";
+import { appendMessage } from "./game/chat.js";
 import { useProfile } from "./hooks/useProfile.js";
 import { getSavedRoom, saveRoom, clearSavedRoom } from "./game/savedRoom.js";
+import ComputerSetup from "./components/ComputerSetup.jsx";
 import Game from "./components/Game.jsx";
 import Lobby from "./components/Lobby.jsx";
 import OnlineGame from "./components/OnlineGame.jsx";
@@ -14,15 +16,16 @@ export default function App() {
   const [connected, setConnected] = useState(socket.connected);
   // true if the connection has been taking a while (free hosts "sleep")
   const [slowConnect, setSlowConnect] = useState(false);
-  // null while in the lobby; { role, state, code } once we are inside a room
+  // null while in the lobby; { role, state, code, chat } once we are inside a room
   // (code is the secret code of a private room, and undefined for a public one)
   const [session, setSession] = useState(null);
   // A message for the lobby, e.g. "you were removed from the room"
   const [notice, setNotice] = useState("");
   // true while we are trying to get back into a room after a refresh
   const [resuming, setResuming] = useState(() => Boolean(getSavedRoom()));
-  // true while playing the offline, same-device game
-  const [local, setLocal] = useState(false);
+  // null in the lobby. Otherwise the offline game: { stage: "setup" } while choosing
+  // the computer's level, or { stage: "play", mode: "two" | "computer", level }.
+  const [offline, setOffline] = useState(null);
 
   useEffect(() => {
     function onConnect() {
@@ -42,7 +45,7 @@ export default function App() {
       const payload = { roomId, playerId: getPlayerId(), ...loadProfile() };
       socket.emit("room:join", payload, (res) => {
         if (res.ok) {
-          setSession({ role: res.role, state: res.state, code: res.code });
+          setSession({ role: res.role, state: res.state, code: res.code, chat: res.chat ?? [] });
         } else {
           // The room is gone (server restarted, or we timed out): back to the lobby.
           clearSavedRoom();
@@ -56,6 +59,14 @@ export default function App() {
     }
     function onGameState(state) {
       setSession((current) => (current ? { ...current, state } : current));
+    }
+    // Chat: one new message, or the whole chat replaced (a new person took the other
+    // seat, so the old conversation is gone).
+    function onChatMessage(message) {
+      setSession((current) => (current ? { ...current, chat: appendMessage(current.chat, message) } : current));
+    }
+    function onChatHistory({ messages }) {
+      setSession((current) => (current ? { ...current, chat: messages } : current));
     }
     // A private room's code was replaced (after the host removed someone).
     function onRoomCode({ code }) {
@@ -73,6 +84,8 @@ export default function App() {
     socket.on("game:state", onGameState);
     socket.on("room:code", onRoomCode);
     socket.on("room:kicked", onKicked);
+    socket.on("chat:message", onChatMessage);
+    socket.on("chat:history", onChatHistory);
     socket.connect();
 
     return () => {
@@ -81,6 +94,8 @@ export default function App() {
       socket.off("game:state", onGameState);
       socket.off("room:code", onRoomCode);
       socket.off("room:kicked", onKicked);
+      socket.off("chat:message", onChatMessage);
+      socket.off("chat:history", onChatHistory);
       socket.disconnect();
     };
   }, []);
@@ -99,7 +114,7 @@ export default function App() {
   function handleEnter(newSession) {
     saveRoom(newSession.state.roomId);
     setNotice("");
-    setSession(newSession);
+    setSession({ ...newSession, chat: newSession.chat ?? [] });
     // Drop any invite ("?room=…" / "?code=…") from the address bar so it can't go stale
     // (and so a private code does not stay visible in the URL).
     window.history.replaceState(null, "", window.location.pathname);
@@ -119,19 +134,23 @@ export default function App() {
         role={session.role}
         state={session.state}
         code={session.code}
+        chat={session.chat}
         connected={connected}
         onLeave={handleLeave}
       />
     );
-  } else if (local) {
+  } else if (offline?.stage === "setup") {
+    content = (
+      <ComputerSetup
+        onStart={(level) => setOffline({ stage: "play", mode: "computer", level })}
+        onBack={() => setOffline(null)}
+      />
+    );
+  } else if (offline) {
     content = (
       <>
-        <Game />
-        <button
-          type="button"
-          className="link-button"
-          onClick={() => setLocal(false)}
-        >
+        <Game mode={offline.mode} level={offline.level} profile={profile} />
+        <button type="button" className="link-button" onClick={() => setOffline(null)}>
           ← Back to lobby
         </button>
       </>
@@ -145,7 +164,8 @@ export default function App() {
         profile={profile}
         onSaveProfile={setProfile}
         onEnter={handleEnter}
-        onPlayLocal={() => setLocal(true)}
+        onPlayLocal={() => setOffline({ stage: "play", mode: "two" })}
+        onPlayComputer={() => setOffline({ stage: "setup" })}
         notice={notice}
       />
     );
@@ -162,7 +182,7 @@ export default function App() {
     <main className="app">
       <ThemeToggle />
       <h1 className="title">Tic Tac Toe</h1>
-      {!local && !session && (
+      {!offline && !session && (
         <p className={`connection ${connected ? "connection--on" : ""}`}>
           {connectionText}
         </p>

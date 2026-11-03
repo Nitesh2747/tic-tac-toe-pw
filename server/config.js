@@ -27,3 +27,11 @@ export const CODE_FAILS_PER_IP = Number(process.env.CODE_FAILS_PER_IP) || 30;
 // Otherwise that header is client-controlled and must be ignored.
 export const TRUST_PROXY = process.env.TRUST_PROXY === "true";
 
+// How long one "second" of the turn timer lasts, in milliseconds. Always 1000 in
+// real life: it exists so tests can run a 15-second timer in under a second.
+export const TURN_SECOND_MS = Number(process.env.TURN_SECOND_MS) || 1000;
+
+// Chat: at most this many messages per player in any window.
+export const CHAT_MAX_MESSAGES = Number(process.env.CHAT_MAX_MESSAGES) || 5;
+export const CHAT_WINDOW_MS = Number(process.env.CHAT_WINDOW_MS) || 5000;
+

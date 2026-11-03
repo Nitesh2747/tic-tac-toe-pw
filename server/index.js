@@ -6,6 +6,7 @@ import { PORT, ALLOWED_ORIGINS } from "./config.js";
 import { registerRoomHandlers } from "./handlers/roomHandlers.js";
 import { registerGameHandlers } from "./handlers/gameHandlers.js";
 import { registerLobbyHandlers } from "./handlers/lobbyHandlers.js";
+import { registerChatHandlers } from "./handlers/chatHandlers.js";
 
 const app = express();
 app.disable("x-powered-by");
@@ -26,6 +27,7 @@ io.on("connection", (socket) => {
   registerRoomHandlers(io, socket);
   registerGameHandlers(io, socket);
   registerLobbyHandlers(io, socket);
+  registerChatHandlers(io, socket);
 });
 
 httpServer.listen(PORT, () => {

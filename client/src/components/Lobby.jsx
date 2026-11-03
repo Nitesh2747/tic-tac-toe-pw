@@ -8,8 +8,9 @@ import Avatar from "./Avatar.jsx";
 import ProfileForm from "./ProfileForm.jsx";
 import CreateRoomForm from "./CreateRoomForm.jsx";
 import RoomList from "./RoomList.jsx";
+import OfflineLinks from "./OfflineLinks.jsx";
 
-export default function Lobby({ connected, profile, onSaveProfile, onEnter, onPlayLocal, notice }) {
+export default function Lobby({ connected, profile, onSaveProfile, onEnter, onPlayLocal, onPlayComputer, notice }) {
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(false); // changing name / avatar
@@ -30,7 +31,7 @@ export default function Lobby({ connected, profile, onSaveProfile, onEnter, onPl
       setError(res.error);
       return;
     }
-    onEnter({ role: res.role, state: res.state, code: res.code });
+    onEnter({ role: res.role, state: res.state, code: res.code, chat: res.chat });
   }
 
   function send(event, payload) {
@@ -66,9 +67,7 @@ export default function Lobby({ connected, profile, onSaveProfile, onEnter, onPl
           }}
           onCancel={profile ? () => setEditing(false) : undefined}
         />
-        <button type="button" className="link-button" onClick={onPlayLocal}>
-          Play on this device instead
-        </button>
+        <OfflineLinks onPlayLocal={onPlayLocal} onPlayComputer={onPlayComputer} />
       </section>
     );
   }
@@ -166,9 +165,7 @@ export default function Lobby({ connected, profile, onSaveProfile, onEnter, onPl
         </p>
       )}
 
-      <button type="button" className="link-button" onClick={onPlayLocal}>
-        Play on this device instead
-      </button>
+      <OfflineLinks onPlayLocal={onPlayLocal} onPlayComputer={onPlayComputer} />
     </section>
   );
 }

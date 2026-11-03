@@ -15,12 +15,16 @@
   --cell: #fbfcfc;
   --cell-hover: #ffffff;
   --board: #1f2a37;
-  --edge: #c3cdcb; /* quiet borders; your own scoreboard cell uses --ink to stand out */
-  --on-ink: #ffffff; /* text on a filled --ink button */
-  --ink-hover: #111a24; /* filled button on hover */
+  --edge: #c3cdcb;
+  /* quiet borders; your own scoreboard cell uses --ink to stand out */
+  --on-ink: #ffffff;
+  /* text on a filled --ink button */
+  --ink-hover: #111a24;
+  /* filled button on hover */
   --ok: #1f7a4d;
   --danger: #b83f1a;
-  --avatar-bg-l: 92%; /* avatar background / pattern lightness */
+  --avatar-bg-l: 92%;
+  /* avatar background / pattern lightness */
   --avatar-fg-l: 33%;
   --radius: 14px;
   font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
@@ -69,11 +73,13 @@
 }
 
 .game--code {
-  --reserve: 23rem; /* + the code line */
+  --reserve: 23rem;
+  /* + the code line */
 }
 
 .game--crowded {
-  --reserve: 24rem; /* + a second row of buttons */
+  --reserve: 24rem;
+  /* + a second row of buttons */
 }
 
 .game--code.game--crowded {
@@ -150,7 +156,8 @@ body {
 /* ---------- board ---------- */
 
 .board {
-  position: relative; /* the win-line SVG is positioned against this */
+  position: relative;
+  /* the win-line SVG is positioned against this */
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
@@ -201,7 +208,8 @@ body {
   inset: 0;
   width: 100%;
   height: 100%;
-  pointer-events: none; /* never block clicks on the squares underneath */
+  pointer-events: none;
+  /* never block clicks on the squares underneath */
 }
 
 .board__line--x {
@@ -363,7 +371,8 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 1px;
-  min-width: 0; /* lets long names shrink instead of widening the grid */
+  min-width: 0;
+  /* lets long names shrink instead of widening the grid */
   padding: 0.25rem 0.4rem;
   color: var(--ink);
   background: var(--cell);
@@ -785,4 +794,344 @@ body {
 .reset--danger:hover {
   color: var(--paper);
   background: var(--danger);
+}
+
+/* ---------- offline play: links, difficulty picker ---------- */
+
+.offline-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.25rem 1rem;
+}
+
+.setup__title {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.level-list {
+  display: grid;
+  gap: 0.5rem;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.level-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  width: 100%;
+  padding: 0.55rem 0.8rem;
+  font: inherit;
+  color: var(--ink);
+  background: var(--cell);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.level-button:hover {
+  background: var(--cell-hover);
+}
+
+.level-button:focus-visible {
+  outline: 3px solid var(--x);
+  outline-offset: 2px;
+}
+
+.level-button__title {
+  font-weight: 800;
+}
+
+.level-button__hint {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+.badge--level {
+  color: var(--x);
+}
+
+/* ---------- turn timer ---------- */
+
+/* The countdown bar is drawn just under the status line, in the gap below it,
+   so it takes up no room of its own. --pct is the share of the turn left. */
+.status--timed {
+  position: relative;
+}
+
+.status--timed::after {
+  content: "";
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  width: var(--pct, 0%);
+  height: 3px;
+  background: currentColor;
+  border-radius: 2px;
+  transform: translateX(-50%);
+  transition: width 0.1s linear;
+}
+
+.status--urgent {
+  color: var(--danger);
+}
+
+.badge--timer {
+  color: var(--ink-soft);
+  text-transform: none;
+  /* "15s", not "15S" */
+}
+
+.create-form__legend {
+  padding: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.create-form__choice--three {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.create-form__choice--three .create-form__legend {
+  grid-column: 1 / -1;
+}
+
+.choice--compact {
+  padding: 0.3rem 0.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status--timed::after {
+    transition: none;
+  }
+}
+
+/* ---------- chat ---------- */
+
+/* The game column, and (on wide windows) the chat beside it. */
+.room {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+}
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  width: 300px;
+  height: min(calc(100svh - 2rem), 520px);
+  overflow: hidden;
+  color: var(--ink);
+  background: var(--cell);
+  border: 2px solid var(--edge);
+  border-radius: var(--radius);
+}
+
+.chat__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid var(--edge);
+}
+
+.chat__title {
+  margin: 0;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.chat__list {
+  overscroll-behavior: contain;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-height: 0;
+  margin: 0;
+  padding: 0.5rem;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.chat__empty {
+  margin: auto;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+
+.chat__item {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.4rem;
+}
+
+.chat__item--mine {
+  justify-content: flex-end;
+}
+
+.chat__item--system {
+  justify-content: center;
+}
+
+.chat__system {
+  font-size: 0.8rem;
+  font-style: italic;
+  text-align: center;
+  color: var(--ink-soft);
+}
+
+.chat__bubble {
+  min-width: 0;
+  max-width: 85%;
+  padding: 0.25rem 0.6rem 0.3rem;
+  background: var(--paper);
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+}
+
+.chat__item--mine .chat__bubble {
+  color: var(--on-ink);
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.chat__meta {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.7rem;
+  color: var(--ink-soft);
+}
+
+.chat__item--mine .chat__meta {
+  color: inherit;
+  opacity: 0.8;
+}
+
+.chat__name {
+  overflow: hidden;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat__text {
+  margin: 0;
+  font-size: 0.95rem;
+  overflow-wrap: anywhere;
+  /* a very long word wraps instead of widening the chat */
+}
+
+.chat__form {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.5rem 0.5rem 0.25rem;
+  border-top: 1px solid var(--edge);
+}
+
+.chat__input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.4rem 0.6rem;
+  font: inherit;
+  color: var(--ink);
+  background: var(--cell);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+}
+
+.chat__input:focus-visible {
+  outline: 3px solid var(--x);
+  outline-offset: 2px;
+}
+
+.chat__input:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.chat__send {
+  padding: 0.3rem 0.8rem;
+}
+
+/* The line under the box: a character count near the limit, or an error. */
+.chat__info {
+  min-height: 1.2rem;
+  margin: 0;
+  padding: 0 0.75rem 0.3rem;
+  font-size: 0.75rem;
+  text-align: right;
+  color: var(--ink-soft);
+}
+
+.chat__error {
+  font-weight: 700;
+  text-align: left;
+  color: var(--danger);
+}
+
+/* On a narrow screen the chat is a sheet that slides over the bottom of the page. */
+.chat--sheet {
+  position: fixed;
+  bottom: var(--kb, 0px);
+  left: 50%;
+  z-index: 20;
+  width: min(100vw, 480px);
+  height: min(60svh, 420px, var(--vvh, 100svh));
+  border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+  box-shadow: 0 -6px 24px rgb(0 0 0 / 0.25);
+  transform: translateX(-50%);
+}
+
+.chat-toggle {
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  left: 12px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  color: var(--ink);
+  background: var(--cell);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.chat-toggle:hover {
+  background: var(--cell-hover);
+}
+
+.chat-toggle:focus-visible {
+  outline: 3px solid var(--x);
+  outline-offset: 2px;
+}
+
+.chat-toggle__badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--paper);
+  background: var(--danger);
+  border-radius: 999px;
 }

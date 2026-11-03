@@ -15,6 +15,8 @@ import { readProfile, readRoomSettings } from "../lib/profile.js";
 import { createFailureLimiter } from "../lib/rateLimit.js";
 import { getClientIp } from "../lib/clientIp.js";
 import { scheduleLobbyUpdate } from "../lib/lobby.js";
+import { addSystemMessage, announce } from "../lib/chat.js";
+import { syncTurnTimer } from "../lib/turnTimer.js";
 import {
   clearGraceTimer,
   startGraceTimer,
@@ -51,7 +53,11 @@ export function registerRoomHandlers(io, socket) {
 
     leaveCurrentRoom(io, socket);
 
-    const room = createRoom({ name: settings.name, visibility: settings.visibility });
+    const room = createRoom({
+      name: settings.name,
+      visibility: settings.visibility,
+      turnSeconds: settings.turnSeconds,
+    });
     if (!room) {
       return ack({ ok: false, error: "Server is busy, try again later" });
     }
@@ -61,7 +67,8 @@ export function registerRoomHandlers(io, socket) {
     socket.data.playerId = playerId;
     console.log(`room ${room.id} (${room.visibility}) created, ${role} = ${socket.id}`);
 
-    ack({ ok: true, role, state: getPublicState(room), code: codeFor(room) });
+    syncTurnTimer(io, room);
+    ack({ ok: true, role, state: getPublicState(room), code: codeFor(room), chat: room.chat });
     if (room.visibility === "public") scheduleLobbyUpdate(io);
   });
 
@@ -106,6 +113,8 @@ export function registerRoomHandlers(io, socket) {
     // Only leave the old room once we know the new one is available.
     if (socket.data.roomId !== room.id) leaveCurrentRoom(io, socket);
 
+    const wasSeated = getRoleOf(room, playerId) !== null;
+    const hadChat = room.chat.length > 0;
     const role = joinRoom(room, playerId, socket.id, profile);
     if (!role) return ack({ ok: false, error: "Room is full" });
 
@@ -115,8 +124,17 @@ export function registerRoomHandlers(io, socket) {
     socket.data.playerId = playerId;
     console.log(`room ${room.id}: ${role} = ${socket.id}`);
 
+    syncTurnTimer(io, room); // the game may just have started, or a dropped player come back
+    // Someone sitting down for the first time (not a refresh) is announced in the chat.
+    // If a DIFFERENT person took the seat, the old chat was cleared: tell the player
+    // who stayed to start over too.
+    if (!wasSeated) {
+      if (hadChat && room.chat.length === 0) socket.to(room.id).emit("chat:history", { messages: [] });
+      socket.to(room.id).emit("chat:message", addSystemMessage(room, `${profile.name} joined.`));
+    }
+
     const state = getPublicState(room);
-    ack({ ok: true, role, state, code: codeFor(room) }); // reply to the joiner
+    ack({ ok: true, role, state, code: codeFor(room), chat: room.chat }); // reply to the joiner
     socket.to(room.id).emit("game:state", state); // tell everyone else in the room
     if (room.visibility === "public") scheduleLobbyUpdate(io);
   });
@@ -133,6 +151,7 @@ export function registerRoomHandlers(io, socket) {
     const room = getRoom(socket.data.roomId);
     if (!room) return ack({ ok: false, error: "You are not in a room" });
 
+    const kickedName = room.players[payload?.seat]?.name;
     const result = kickPlayer(room, socket.data.playerId, payload?.seat);
     if (!result.ok) return ack(result);
 
@@ -150,6 +169,8 @@ export function registerRoomHandlers(io, socket) {
     console.log(`room ${room.id}: ${kicked.playerId.slice(0, 6)} was removed by the host`);
 
     ack({ ok: true });
+    announce(io, room, `${kickedName} was removed by the host.`); // (the removed player has left the room already)
+    syncTurnTimer(io, room); // a seat just emptied: the clock stops
     io.to(room.id).emit("game:state", getPublicState(room));
     // A private room's code was replaced: the player who stays needs the new one.
     if (room.visibility === "private") io.to(room.id).emit("room:code", { code: room.code });
@@ -166,6 +187,7 @@ export function registerRoomHandlers(io, socket) {
     const room = getRoom(roomId);
     if (!room || !markDisconnected(room, playerId, socket.id)) return;
 
+    syncTurnTimer(io, room); // a player dropped: pause the clock
     io.to(roomId).emit("game:state", getPublicState(room));
     startGraceTimer(io, roomId, playerId);
     // The room may have just become empty of online players: update the list.

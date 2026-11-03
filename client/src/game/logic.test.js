@@ -54,6 +54,13 @@ describe("getGameStatus", () => {
 });
 
 describe("applyMove", () => {
+  it("ignores anything that is not a real cell number", () => {
+    const b = board("--- --- ---");
+    for (const bad of ["1", "0", 1.5, -1, 9, 99, NaN, null, undefined, {}, [1]]) {
+      expect(applyMove(b, bad, "X")).toBe(b);
+    }
+  });
+
   it("places a mark without mutating the old board", () => {
     const next = applyMove(EMPTY_BOARD, 4, "X");
     expect(next[4]).toBe("X");

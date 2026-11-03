@@ -1,3 +1,5 @@
+import { TURN_SECONDS_OPTIONS } from "../game/room.js";
+
 // A player's public profile: a display name and an avatar seed.
 // Everything here comes from the client, so everything here is checked.
 //
@@ -53,7 +55,7 @@ export function isValidRoomName(name) {
 }
 
 // Reads the room settings out of an untrusted payload.
-// Returns { ok: true, name, visibility } or { ok: false, error }.
+// Returns { ok: true, name, visibility, turnSeconds } or { ok: false, error }.
 // An empty room name falls back to "<host>'s room".
 export function readRoomSettings(payload, hostName) {
   const visibility = payload?.visibility ?? "public";
@@ -61,17 +63,23 @@ export function readRoomSettings(payload, hostName) {
     return { ok: false, error: "Invalid room type" };
   }
 
+  // The turn timer: 0 (off) by default, or one of the allowed lengths in seconds.
+  const turnSeconds = payload?.turnSeconds ?? 0;
+  if (!TURN_SECONDS_OPTIONS.includes(turnSeconds)) {
+    return { ok: false, error: "Invalid turn timer" };
+  }
+
   const raw = payload?.roomName;
   if (raw === undefined || raw === null) {
-    return { ok: true, name: `${hostName}'s room`, visibility };
+    return { ok: true, name: `${hostName}'s room`, visibility, turnSeconds };
   }
   if (typeof raw !== "string") return { ok: false, error: "Invalid room name" };
 
   const name = cleanName(raw);
-  if (name === "") return { ok: true, name: `${hostName}'s room`, visibility };
+  if (name === "") return { ok: true, name: `${hostName}'s room`, visibility, turnSeconds };
   if (!isValidRoomName(name)) {
     return { ok: false, error: `Room name must be ${ROOM_NAME_MIN} to ${ROOM_NAME_MAX} characters` };
   }
-  return { ok: true, name, visibility };
+  return { ok: true, name, visibility, turnSeconds };
 }
 

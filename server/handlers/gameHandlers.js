@@ -1,5 +1,7 @@
 // Socket events about playing: moves and starting a new round.
 import { getRoom, makeMove, resetGame, getPublicState } from "../game/room.js";
+import { syncTurnTimer } from "../lib/turnTimer.js";
+import { announceResult } from "../lib/chat.js";
 
 export function registerGameHandlers(io, socket) {
   socket.on("game:move", (payload, ack) => {
@@ -12,7 +14,9 @@ export function registerGameHandlers(io, socket) {
     if (!result.ok) return ack(result);
 
     ack({ ok: true });
+    syncTurnTimer(io, room); // a fresh clock for the other player (or none if the game ended)
     io.to(room.id).emit("game:state", getPublicState(room)); // everyone, including the mover
+    announceResult(io, room); // if that move ended the round, say so in the chat
   });
 
   socket.on("game:reset", (ack) => {
@@ -24,6 +28,7 @@ export function registerGameHandlers(io, socket) {
     if (!result.ok) return ack(result);
 
     ack({ ok: true });
+    syncTurnTimer(io, room); // a new round: the clock starts again
     io.to(room.id).emit("game:state", getPublicState(room));
   });
 }

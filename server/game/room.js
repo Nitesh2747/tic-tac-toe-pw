@@ -1,5 +1,5 @@
 import { randomInt } from "node:crypto";
-import { EMPTY_BOARD, applyMove, getGameStatus } from "./logic.js";
+import { EMPTY_BOARD, applyMove, getComputerMove, getGameStatus } from "./logic.js";
 
 // All rooms live in memory.
 const rooms = new Map(); // roomId -> room
@@ -37,6 +37,9 @@ export function normalizeCode(raw) {
   return String(raw ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
+// The turn timer choices the host can pick when creating a room (0 = no timer).
+export const TURN_SECONDS_OPTIONS = [0, 15, 30];
+
 // Rooms live in memory, so cap them: nobody can fill the server's RAM by
 // spamming "create room".
 const MAX_ROOMS = 1000;
@@ -57,7 +60,7 @@ function startFreshBoard(room) {
 // listed in the lobby and joined by clicking. Private rooms are never listed;
 // they are joined with their secret code (or a link that contains it).
 // Returns the new room, or null if the server is full.
-export function createRoom({ name = "Room", visibility = "public" } = {}) {
+export function createRoom({ name = "Room", visibility = "public", turnSeconds = 0 } = {}) {
   if (rooms.size >= MAX_ROOMS) return null;
   const isPrivate = visibility === "private";
   const room = {
@@ -65,6 +68,9 @@ export function createRoom({ name = "Room", visibility = "public" } = {}) {
     name,
     visibility: isPrivate ? "private" : "public",
     code: isPrivate ? uniqueCode() : null, // secret: never in public state or the lobby list
+    turnSeconds: TURN_SECONDS_OPTIONS.includes(turnSeconds) ? turnSeconds : 0, // 0 = no timer
+    turnDeadline: null, // when the running turn timer fires (ms since 1970); null = not running
+    turnMs: null, // how long that turn timer was set for
     hostId: null, // the first player to sit down; the host can remove players
     bannedIds: new Set(), // players the host removed
     createdAt: Date.now(),
@@ -73,6 +79,8 @@ export function createRoom({ name = "Room", visibility = "public" } = {}) {
     starter: "X", // who moves first this round; alternates every round
     scores: newScores(), // wins per seat, plus draws, for the current pair of players
     scoreOwners: { X: null, O: null }, // who last sat in each seat: the score belongs to them
+    chat: [], // the last messages, newest last (see lib/chat.js)
+    chatSeq: 0, // numbers the messages so they stay in order
     players: { X: null, O: null }, // each seat: { playerId, socketId, connected, name, avatarSeed } or null
   };
   rooms.set(room.id, room);
@@ -144,6 +152,7 @@ export function joinRoom(room, playerId, socketId, profile = DEFAULT_PROFILE) {
         room.scores = newScores();
         room.starter = "X";
         startFreshBoard(room);
+        room.chat = []; // a new pair of players does not read the old pair's chat
       }
       room.scoreOwners[role] = playerId;
       if (room.hostId === null) room.hostId = playerId;
@@ -175,6 +184,10 @@ export function getPublicState(room) {
     name: room.name,
     visibility: room.visibility,
     hostSeat: getRoleOf(room, room.hostId), // "X", "O" or null. Never the host's id.
+    turnSeconds: room.turnSeconds,
+    // The turn timer, as time REMAINING (not a clock time), so players' own clocks never matter.
+    turnMs: room.turnDeadline ? room.turnMs : null,
+    turnMsLeft: room.turnDeadline ? Math.max(0, room.turnDeadline - Date.now()) : null,
     board: room.board,
     xIsNext: room.xIsNext,
     status: room.players.X && room.players.O ? "playing" : "waiting",
@@ -220,10 +233,38 @@ export function makeMove(room, playerId, index) {
   const nextBoard = applyMove(room.board, index, role);
   if (nextBoard === room.board) return { ok: false, error: "Square already taken" };
 
+  commitMove(room, nextBoard);
+  return { ok: true };
+}
+
+// Make a move that has already been checked: pass the turn and count a result.
+function commitMove(room, nextBoard) {
   room.board = nextBoard;
   room.xIsNext = !room.xIsNext;
   recordResult(room);
-  return { ok: true };
+}
+
+// Should the turn timer be running right now? Only if the room has one, both
+// players are sitting down AND online, and the game is not over. If a player
+// drops, the clock stops: nobody loses time to a bad connection.
+export function turnTimerShouldRun(room) {
+  if (room.turnSeconds <= 0) return false;
+  if (!room.players.X?.connected || !room.players.O?.connected) return false;
+  return !getGameStatus(room.board, room.xIsNext).gameOver;
+}
+
+// The turn timer ran out: play a random legal move for whoever's turn it is.
+// Returns { ok: true, seat, index } or { ok: false }.
+export function autoMove(room) {
+  if (!room.players.X || !room.players.O) return { ok: false };
+  const { gameOver, nextPlayer } = getGameStatus(room.board, room.xIsNext);
+  if (gameOver) return { ok: false };
+
+  const index = getComputerMove(room.board, nextPlayer, "easy");
+  if (index === -1) return { ok: false };
+
+  commitMove(room, applyMove(room.board, index, nextPlayer));
+  return { ok: true, seat: nextPlayer, index };
 }
 
 // Start a new game in the same room. Only allowed once the current game is over.
