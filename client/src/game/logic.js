@@ -1,6 +1,4 @@
 // Pure game logic: no React in here.
-// Later, the Express/Socket.IO server (and the Discord bot) can reuse this file.
-//
 // The board is a flat array of 9 cells. Each cell is null, "X" or "O".
 // Index layout:
 //   0 | 1 | 2

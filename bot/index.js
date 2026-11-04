@@ -1,6 +1,7 @@
 // Starts the Tic Tac Toe Discord bot.
 import "dotenv/config";
 import { Client, Events, GatewayIntentBits } from "discord.js";
+import { handleInteraction } from "./interactions.js";
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
@@ -8,13 +9,17 @@ if (!token) {
   process.exit(1);
 }
 
-// "Intents" say which kinds of events the bot wants to hear about. Guilds/servers is the minimum, and slash commands and buttons need nothing more.
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+
+const games = new Map();
 
 // Runs once, when the bot has connected and is ready.
 client.once(Events.ClientReady, (readyClient) => {
   console.log(`Ready! Logged in as ${readyClient.user.tag}`);
 });
+
+// Runs every time someone uses a slash command or clicks a button.
+client.on(Events.InteractionCreate, (interaction) => handleInteraction(interaction, games));
 
 client.login(token).catch((error) => {
   console.error("Could not log in:", error.message);
