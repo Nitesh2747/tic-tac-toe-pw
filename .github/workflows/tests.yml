@@ -1,0 +1,50 @@
+# Runs the tests automatically on a clean GitHub machine whenever code is pushed.
+name: Tests
+
+on:
+  push:
+    branches: [main] # every push to the main branch
+  pull_request: # and every pull request
+
+# The workflow only needs to read the code, so it is not given more than that.
+permissions:
+  contents: read
+
+jobs:
+  # Two jobs, one per folder. They run side by side, and each one shows up separately in GitHub
+  server:
+    name: Server tests
+    runs-on: ubuntu-latest # a fresh, empty Linux machine for every run
+    defaults:
+      run:
+        working-directory: server # every "run" step below happens inside server/
+    steps:
+      - uses: actions/checkout@v4 # download the repo's code onto the machine
+
+      - uses: actions/setup-node@v4 # install Node, the same version you use locally
+        with:
+          node-version: 22.14.0
+          cache: npm # keep downloaded packages for next time, so runs are faster
+          cache-dependency-path: server/package-lock.json
+
+      - run: npm ci # install exactly what package-lock.json says (and fail if it is out of date)
+      - run: npm test # the 194 unit tests plus the integration tests
+
+  client:
+    name: Client tests and build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - run: npm ci
+      - run: npm test
+      - run: npm run build # also check that the site still builds

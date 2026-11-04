@@ -5,7 +5,7 @@ Real-time multiplayer Tic Tac Toe in the browser. Play in public or private room
 <!-- Live demo: add your link here -->
 
 <p align="center">
-  <img src="client/public/images/04-playing.png" width="760" alt="A timed game in progress: the board, scoreboard and turn countdown next to the chat panel">
+  <img src="screenshots/04-playing.png" width="760" alt="A timed game in progress: the board, scoreboard and turn countdown next to the chat panel">
 </p>
 
 **Contents:** [Features](#features) · [A tour](#a-tour) · [How it works](#how-it-works) · [The protocol](#the-protocol) · [Project structure](#project-structure) · [Getting started](#getting-started) · [Configuration](#configuration) · [Tests](#tests) · [Deploying](#deploying) · [Security notes](#security-notes) · [Known limitations](#known-limitations) · [What's next](#whats-next)
@@ -41,37 +41,37 @@ The code is split into two small apps, each with its own README: [`client/`](cli
 ## A tour
 
 <p align="center">
-  <img src="client/public/images/06-win.png" width="680" alt="A won round: a line through the top row, the score updated and a chat line announcing the winner"><br>
+  <img src="screenshots/06-win.png" width="680" alt="A won round: a line through the top row, the score updated and a chat line announcing the winner"><br>
   <em>A won round. The line is drawn over the three winning tiles, and the chat announces the result.</em>
 </p>
 
 <p align="center">
-  <img src="client/public/images/05-dark.png" width="680" alt="The same game in dark theme, seen from the second player's side"><br>
+  <img src="screenshots/05-dark.png" width="680" alt="The same game in dark theme, seen from the second player's side"><br>
   <em>The same game from the other player's side, in the dark theme.</em>
 </p>
 
 <p align="center">
-  <img src="client/public/images/03-private-room.png" width="680" alt="A private room waiting for an opponent, with the room code shown and a copy invite link button"><br>
+  <img src="screenshots/03-private-room.png" width="680" alt="A private room waiting for an opponent, with the room code shown and a copy invite link button"><br>
   <em>A private room. The code is only visible to the people sitting in it; the host can show, hide and copy it.</em>
 </p>
 
 <p align="center">
-  <img src="client/public/images/07-disconnected.png" width="680" alt="A game paused because the opponent disconnected"><br>
+  <img src="screenshots/07-disconnected.png" width="680" alt="A game paused because the opponent disconnected"><br>
   <em>The opponent's connection dropped. The game pauses and the turn timer stops, and their seat is held for 60 seconds.</em>
 </p>
 
 <table>
   <tr>
-    <td align="center"><img src="client/public/images/01-lobby.png" width="270" alt="The lobby listing three public rooms"><br><sub><b>Lobby</b><br>only public rooms are listed</sub></td>
-    <td align="center"><img src="client/public/images/02-create-room.png" width="270" alt="The create room form with visibility and turn timer choices"><br><sub><b>Create a room</b><br>name, visibility, turn timer</sub></td>
-    <td align="center"><img src="client/public/images/08-computer.png" width="270" alt="A game against the computer on the hard level"><br><sub><b>Computer opponent</b><br>works with no server</sub></td>
+    <td align="center"><img src="screenshots/01-lobby.png" width="270" alt="The lobby listing three public rooms"><br><sub><b>Lobby</b><br>only public rooms are listed</sub></td>
+    <td align="center"><img src="screenshots/02-create-room.png" width="270" alt="The create room form with visibility and turn timer choices"><br><sub><b>Create a room</b><br>name, visibility, turn timer</sub></td>
+    <td align="center"><img src="screenshots/08-computer.png" width="270" alt="A game against the computer on the hard level"><br><sub><b>Computer opponent</b><br>works with no server</sub></td>
   </tr>
 </table>
 
 <table>
   <tr>
-    <td align="center"><img src="client/public/images/09-mobile.png" width="260" alt="A game on a phone with an unread badge on the chat button"><br><sub><b>On a phone</b><br>unread badge on the chat button</sub></td>
-    <td align="center"><img src="client/public/images/10-mobile-chat.png" width="260" alt="The chat open as a bottom sheet on a phone"><br><sub><b>Chat as a bottom sheet</b><br>stays above the keyboard</sub></td>
+    <td align="center"><img src="screenshots/09-mobile.png" width="260" alt="A game on a phone with an unread badge on the chat button"><br><sub><b>On a phone</b><br>unread badge on the chat button</sub></td>
+    <td align="center"><img src="screenshots/10-mobile-chat.png" width="260" alt="The chat open as a bottom sheet on a phone"><br><sub><b>Chat as a bottom sheet</b><br>stays above the keyboard</sub></td>
   </tr>
 </table>
 
@@ -241,7 +241,7 @@ All client-to-server events take an acknowledgement callback and answer `{ ok: t
 │       ├── rateLimit.js          sliding-window limits (wrong codes, chat)
 │       ├── profile.js, validate.js   checking what browsers send
 │       └── clientIp.js           finding a client's address, proxy-aware
-└── docs/screenshots/             the images in this README
+└── screenshots/             the images in this README
 ```
 
 ## Getting started

@@ -28,9 +28,7 @@ import {
   CODE_FAILS_PER_IP,
 } from "../config.js";
 
-// Wrong private-room codes are limited per connection AND per IP address, so
-// guessing codes is hopeless. A room itself is never locked, because that would
-// let anyone lock a host's guests out just by spamming wrong codes.
+// Wrong private-room codes are limited per connection AND per IP address, so guessing codes is hopeless. A room itself is never locked, because that would let anyone lock a host's guests out just by spamming wrong codes.
 const socketLimiter = createFailureLimiter({ limit: CODE_FAILS_PER_SOCKET, windowMs: CODE_FAIL_WINDOW_MS });
 const ipLimiter = createFailureLimiter({ limit: CODE_FAILS_PER_IP, windowMs: CODE_FAIL_WINDOW_MS });
 
@@ -40,8 +38,6 @@ function codeFor(room) {
 }
 
 export function registerRoomHandlers(io, socket) {
-  // Note: payload ?? {} because a client can send null, and destructuring
-  // null would throw and crash the whole server.
   socket.on("room:create", (payload, ack) => {
     if (typeof ack !== "function") return;
     const { playerId } = payload ?? {};
@@ -72,8 +68,7 @@ export function registerRoomHandlers(io, socket) {
     if (room.visibility === "public") scheduleLobbyUpdate(io);
   });
 
-  // Join by room id (a public room, or the room you already sit in) or by code
-  // (a private room).
+  // Join by room id (a public room, or the room you already sit in) or by code (a private room).
   socket.on("room:join", (payload, ack) => {
     if (typeof ack !== "function") return;
     const { playerId, roomId, code } = payload ?? {};
@@ -85,8 +80,7 @@ export function registerRoomHandlers(io, socket) {
     if (hasCode && !isId(code)) return ack({ ok: false, error: "No room found for that code" });
     if (!hasCode && !isId(roomId)) return ack({ ok: false, error: "Missing room" });
 
-    // Check the limits BEFORE looking at the code, so that a blocked client
-    // cannot even tell whether a guess was right.
+    // Check the limits BEFORE looking at the code, so that a blocked client cannot even tell whether a guess was right.
     const ip = getClientIp(socket);
     if (hasCode) {
       const waitMs = Math.max(socketLimiter.retryAfterMs(socket.id), ipLimiter.retryAfterMs(ip));
@@ -124,10 +118,7 @@ export function registerRoomHandlers(io, socket) {
     socket.data.playerId = playerId;
     console.log(`room ${room.id}: ${role} = ${socket.id}`);
 
-    syncTurnTimer(io, room); // the game may just have started, or a dropped player come back
-    // Someone sitting down for the first time (not a refresh) is announced in the chat.
-    // If a DIFFERENT person took the seat, the old chat was cleared: tell the player
-    // who stayed to start over too.
+    syncTurnTimer(io, room); 
     if (!wasSeated) {
       if (hadChat && room.chat.length === 0) socket.to(room.id).emit("chat:history", { messages: [] });
       socket.to(room.id).emit("chat:message", addSystemMessage(room, `${profile.name} joined.`));
@@ -177,8 +168,7 @@ export function registerRoomHandlers(io, socket) {
     else scheduleLobbyUpdate(io);
   });
 
-  // A dropped connection does not free the seat right away: the player gets
-  // RECONNECT_GRACE_MS to come back (refresh, flaky wifi) before it is freed.
+  // A dropped connection does not free the seat right away: the player gets RECONNECT_GRACE_MS to come back (refresh, flaky wifi) before it is freed.
   socket.on("disconnect", (reason) => {
     console.log("disconnected:", socket.id, reason);
 
