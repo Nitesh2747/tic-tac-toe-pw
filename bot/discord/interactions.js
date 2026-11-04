@@ -1,16 +1,15 @@
 // Handles what happens when someone uses /ttt or clicks a button.
-// index.js only connects to Discord and hands every interaction to handleInteraction,
-// so everything in here can be tested with fake interaction objects.
+// index.js only connects to Discord and hands every interaction to handleInteraction, so everything in here can be tested with fake interaction objects.
 import { MessageFlags } from "discord.js";
-import { COMPUTER, createGame, playMove } from "./game/game.js";
-import { MOVE_PREFIX } from "./game/board.js";
+import { COMPUTER, createGame, playMove, rematch, resign, seatOf } from "../game/game.js";
+import { MOVE_PREFIX, REMATCH_ID, RESIGN_ID } from "../game/board.js";
 import {
   ACCEPT_ID,
   DECLINE_ID,
   acceptChallenge,
   closeChallenge,
   createChallenge,
-} from "./game/challenge.js";
+} from "../game/challenge.js";
 import { toChallengeMessage, toClosedMessage, toMessage } from "./render.js";
 
 // "ttt:move:4" -> 4. Anything else (wrong prefix, "ttt:move:99", "ttt:move:1x") -> null.
@@ -25,12 +24,10 @@ export function parseMoveId(customId) {
 // A reply only the person who clicked can see.
 const privately = (content) => ({ content, flags: MessageFlags.Ephemeral });
 
-// Posts a message and remembers what it stands for (a game or a challenge), keyed by the
-// id of the message, which is how a later click finds it again.
 async function postAndRemember(interaction, games, message, entry) {
   await interaction.reply(message);
   const posted = await interaction.fetchReply();
-  games.set(posted.id, entry);
+  games.set(posted.id, entry, { channelId: interaction.channelId });
 }
 
 async function startComputerGame(interaction, games) {
@@ -68,6 +65,21 @@ async function handleMove(interaction, games, index) {
   return interaction.update(toMessage(result.game));
 }
 
+// Resign and Play again: look the game up, run the rule, and show the result.
+async function handleControl(interaction, games, id) {
+  const game = games.get(interaction.message.id);
+  if (!game || game.pending) {
+    return interaction.reply(privately("This game isn't active any more. Start a new one with /ttt."));
+  }
+  const userId = interaction.user.id;
+  if (!seatOf(game, userId)) return interaction.reply(privately("You're not playing in this game."));
+
+  const result = id === RESIGN_ID ? resign(game, userId) : rematch(game);
+  if (!result.ok) return interaction.reply(privately(result.error));
+  games.set(interaction.message.id, result.game);
+  return interaction.update(toMessage(result.game));
+}
+
 async function handleChallengeButton(interaction, games, accepting) {
   const challenge = games.get(interaction.message.id);
   if (!challenge?.pending) {
@@ -99,6 +111,9 @@ export async function handleInteraction(interaction, games) {
     if (interaction.isButton()) {
       if (interaction.customId === ACCEPT_ID) return await handleChallengeButton(interaction, games, true);
       if (interaction.customId === DECLINE_ID) return await handleChallengeButton(interaction, games, false);
+      if (interaction.customId === RESIGN_ID || interaction.customId === REMATCH_ID) {
+        return await handleControl(interaction, games, interaction.customId);
+      }
       const index = parseMoveId(interaction.customId);
       if (index === null) return;
       return await handleMove(interaction, games, index);
@@ -106,5 +121,10 @@ export async function handleInteraction(interaction, games) {
   } catch (error) {
     // One failed call must not take the whole bot down.
     console.error("Interaction failed:", error);
+    // Tell the person something went wrong instead of leaving "This interaction failed".
+    // (If we already answered, or even this reply fails, there is nothing more to do.)
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply(privately("Something went wrong. Please try again.")).catch(() => {});
+    }
   }
 }

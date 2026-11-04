@@ -1,7 +1,9 @@
 // Starts the Tic Tac Toe Discord bot.
 import "dotenv/config";
 import { Client, Events, GatewayIntentBits } from "discord.js";
-import { handleInteraction } from "./interactions.js";
+import { handleInteraction } from "./discord/interactions.js";
+import { IDLE_MINUTES, closeIdleGames } from "./discord/expire.js";
+import { createStore } from "./game/store.js";
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
@@ -9,17 +11,33 @@ if (!token) {
   process.exit(1);
 }
 
+// "Intents" say which kinds of events the bot wants to hear about. Guilds/Servers is the minimum, and slash commands and buttons need nothing more.
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
-const games = new Map();
+const games = createStore({ idleMs: IDLE_MINUTES * 60_000 });
 
 // Runs once, when the bot has connected and is ready.
 client.once(Events.ClientReady, (readyClient) => {
   console.log(`Ready! Logged in as ${readyClient.user.tag}`);
+  // Once a minute, close the boards nobody is playing any more.
+  setInterval(() => closeIdleGames(games, client), 60_000);
 });
 
 // Runs every time someone uses a slash command or clicks a button.
 client.on(Events.InteractionCreate, (interaction) => handleInteraction(interaction, games));
+
+// Without these, one unlucky network error could crash the whole bot.
+client.on(Events.Error, (error) => console.error("Discord client error:", error));
+process.on("unhandledRejection", (error) => console.error("Unhandled rejection:", error));
+
+// Ctrl+C or a host stopping the bot: disconnect cleanly.
+for (const signal of ["SIGINT", "SIGTERM"]) {
+  process.on(signal, async () => {
+    console.log(`${signal}: shutting down`);
+    await client.destroy();
+    process.exit(0);
+  });
+}
 
 client.login(token).catch((error) => {
   console.error("Could not log in:", error.message);

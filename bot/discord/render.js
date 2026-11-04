@@ -2,8 +2,8 @@
 // The decisions about WHAT to show are made in game/board.js; this file only
 // builds the Discord objects from them.
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
-import { describeBoard } from "./game/board.js";
-import { describeChallenge } from "./game/challenge.js";
+import { describeBoard } from "../game/board.js";
+import { describeChallenge } from "../game/challenge.js";
 
 const STYLES = {
   primary: ButtonStyle.Primary, // blue
@@ -22,10 +22,11 @@ function toButton({ customId, label, style, disabled }) {
 
 // The object you pass to interaction.reply(...) or interaction.update(...).
 export function toMessage(game) {
-  const { content, rows } = describeBoard(game);
+  const { content, rows, controls } = describeBoard(game);
   return {
     content,
-    components: rows.map((row) => new ActionRowBuilder().addComponents(row.map(toButton))),
+    // Three rows of squares, then a row with Resign / Play again (Discord allows 5 rows).
+    components: [...rows, controls].map((row) => new ActionRowBuilder().addComponents(row.map(toButton))),
     // Show names for the mentions, but never ping anyone because a board changed.
     allowedMentions: { parse: [] },
   };

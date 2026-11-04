@@ -81,3 +81,21 @@ describe("the text", () => {
     expect(content).toContain("draws 1");
   });
 });
+
+describe("the controls under the board", () => {
+  it("offers Resign while the round is going", () => {
+    const { controls } = describeBoard(createGame({ x: ALICE, o: BOB }));
+    expect(controls).toEqual([{ customId: "ttt:resign", label: "Resign", style: "secondary", disabled: false }]);
+  });
+
+  it("offers Play again once the round is over", () => {
+    const game = resign(createGame({ x: ALICE, o: BOB }), ALICE).game;
+    const { controls } = describeBoard(game);
+    expect(controls).toEqual([{ customId: "ttt:rematch", label: "Play again", style: "success", disabled: false }]);
+  });
+
+  it("says who resigned", () => {
+    const game = resign(createGame({ x: ALICE, o: BOB }), ALICE).game;
+    expect(describeBoard(game).content).toContain("🏳️ <@100> resigned.\n🎉 <@200> wins!");
+  });
+});

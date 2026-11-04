@@ -7,6 +7,10 @@ import { COMPUTER, currentSeat, getResult } from "./game.js";
 // When someone clicks, the id tells the bot which square it was.
 export const MOVE_PREFIX = "ttt:move:";
 
+// The buttons under the board: Resign while the round is going, Play again once it is over.
+export const RESIGN_ID = "ttt:resign";
+export const REMATCH_ID = "ttt:rematch";
+
 // Discord insists that a button has a label, so an empty square gets an invisible character.
 const EMPTY_LABEL = "​";
 
@@ -32,7 +36,10 @@ function describeSquare(game, index, result) {
 function describeStatus(game, result) {
   const lines = [`**X** ${nameOf(game, "X")}  vs  **O** ${nameOf(game, "O")}`];
 
-  if (result.winner) {
+  if (result.resignedBy) {
+    lines.push(`🏳️ ${nameOf(game, result.resignedBy)} resigned.`);
+    lines.push(`🎉 ${nameOf(game, result.winner)} wins!`);
+  } else if (result.winner) {
     lines.push(`🎉 ${nameOf(game, result.winner)} wins!`);
   } else if (result.isDraw) {
     lines.push("It's a draw.");
@@ -46,7 +53,12 @@ function describeStatus(game, result) {
   return lines.join("\n");
 }
 
-// { content: "the text above the board", rows: [[3 buttons], [3 buttons], [3 buttons]] }
+function describeControls(result) {
+  if (result.over) return [{ customId: REMATCH_ID, label: "Play again", style: "success", disabled: false }];
+  return [{ customId: RESIGN_ID, label: "Resign", style: "secondary", disabled: false }];
+}
+
+// { content: "the text above the board", rows: [[3 buttons] x 3], controls: [1 button] }
 // Each button is { customId, label, style, disabled }, with style one of
 // "primary" | "secondary" | "success" | "danger".
 export function describeBoard(game) {
@@ -55,5 +67,6 @@ export function describeBoard(game) {
   return {
     content: describeStatus(game, result),
     rows: [squares.slice(0, 3), squares.slice(3, 6), squares.slice(6, 9)],
+    controls: describeControls(result),
   };
 }

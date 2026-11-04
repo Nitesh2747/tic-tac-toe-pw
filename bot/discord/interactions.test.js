@@ -14,6 +14,7 @@ function fakeCommand({ userId = "u1", subcommand = "computer", level = null, opp
       getString: () => level,
       getUser: () => opponent,
     },
+    channelId: "chan1",
     reply: vi.fn().mockResolvedValue(undefined),
     fetchReply: vi.fn().mockResolvedValue({ id: "msg1" }),
   };
@@ -54,6 +55,13 @@ describe("/ttt computer", () => {
     await handleInteraction(command, games);
     expect(command.reply).toHaveBeenCalledOnce();
     expect(games.get("msg1")).toMatchObject({ players: { X: "u1", O: "computer" }, level: "medium" });
+  });
+
+  it("stores the channel too, so an idle game can be closed later", async () => {
+    const stored = [];
+    const games = { get: () => undefined, set: (...args) => stored.push(args) };
+    await handleInteraction(fakeCommand(), games);
+    expect(stored[0][2]).toEqual({ channelId: "chan1" });
   });
 
   it("uses the chosen level", async () => {
@@ -139,6 +147,28 @@ describe("clicking a square", () => {
     const final = games.get("msg1");
     const over = final.board.every((c) => c !== null) || final.board.some((c, i) => c && [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]].some((l) => l.includes(i) && l.every((j) => final.board[j] === c)));
     expect(over).toBe(true);
+  });
+
+  it("tells the person when something goes wrong, and does not crash", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const click = fakeClick({ customId: "ttt:move:4" });
+    click.update.mockRejectedValue(new Error("boom"));
+    await handleInteraction(click, games);
+    expect(click.reply).toHaveBeenCalledWith({
+      content: "Something went wrong. Please try again.",
+      flags: MessageFlags.Ephemeral,
+    });
+    spy.mockRestore();
+  });
+
+  it("does not answer twice when the interaction was already answered", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const click = fakeClick({ customId: "ttt:move:4" });
+    click.update.mockRejectedValue(new Error("boom"));
+    click.replied = true;
+    await handleInteraction(click, games);
+    expect(click.reply).not.toHaveBeenCalled();
+    spy.mockRestore();
   });
 
   it("logs instead of crashing when Discord fails", async () => {
@@ -246,5 +276,75 @@ describe("a game between two people", () => {
     const click = fakeClick({ userId: "u2", customId: "ttt:move:0" });
     await handleInteraction(click, games);
     expect(click.reply.mock.calls[0][0].content).toBe("This challenge hasn't been accepted yet.");
+  });
+});
+
+describe("Resign and Play again", () => {
+  let games;
+  beforeEach(async () => {
+    games = new Map();
+    await handleInteraction(fakeCommand({ subcommand: "challenge" }), games);
+    await handleInteraction(fakeClick({ userId: "u2", customId: "ttt:accept" }), games); // u1 = X, u2 = O
+  });
+
+  it("resigning gives the other player the round and the point", async () => {
+    const click = fakeClick({ userId: "u1", customId: "ttt:resign" });
+    await handleInteraction(click, games);
+    expect(click.update).toHaveBeenCalledOnce();
+    expect(games.get("msg1")).toMatchObject({ resignedBy: "X", scores: { X: 0, O: 1, draws: 0 } });
+  });
+
+  it("a stranger cannot resign or restart someone else's game", async () => {
+    for (const customId of ["ttt:resign", "ttt:rematch"]) {
+      const click = fakeClick({ userId: "stranger", customId });
+      await handleInteraction(click, games);
+      expect(click.update).not.toHaveBeenCalled();
+      expect(click.reply.mock.calls[0][0].content).toBe("You're not playing in this game.");
+    }
+  });
+
+  it("Play again starts a new round: score kept, the other player starts", async () => {
+    await handleInteraction(fakeClick({ userId: "u1", customId: "ttt:resign" }), games);
+    const click = fakeClick({ userId: "u2", customId: "ttt:rematch" });
+    await handleInteraction(click, games);
+
+    expect(click.update).toHaveBeenCalledOnce();
+    const game = games.get("msg1");
+    expect(game.board.every((cell) => cell === null)).toBe(true);
+    expect(game.resignedBy).toBeNull();
+    expect(game.scores).toEqual({ X: 0, O: 1, draws: 0 });
+    expect(game.xIsNext).toBe(false); // O starts this time
+  });
+
+  it("Play again is refused while the round is still going", async () => {
+    const click = fakeClick({ userId: "u1", customId: "ttt:rematch" });
+    await handleInteraction(click, games);
+    expect(click.reply.mock.calls[0][0].content).toBe("The game isn't finished yet.");
+  });
+
+  it("Resign is refused once the round is over", async () => {
+    await handleInteraction(fakeClick({ userId: "u1", customId: "ttt:resign" }), games);
+    const click = fakeClick({ userId: "u2", customId: "ttt:resign" });
+    await handleInteraction(click, games);
+    expect(click.reply.mock.calls[0][0].content).toBe("This game is over.");
+  });
+
+  it("does nothing useful on an unknown or pending message", async () => {
+    const click = fakeClick({ messageId: "nope", userId: "u1", customId: "ttt:resign" });
+    await handleInteraction(click, games);
+    expect(click.reply.mock.calls[0][0].content).toContain("isn't active any more");
+  });
+});
+
+describe("rematch against the computer", () => {
+  it("the computer opens the next round when it is its turn to start", async () => {
+    const games = new Map();
+    await handleInteraction(fakeCommand(), games);
+    await handleInteraction(fakeClick({ customId: "ttt:resign" }), games);
+    await handleInteraction(fakeClick({ customId: "ttt:rematch" }), games);
+    const game = games.get("msg1");
+    expect(game.board.filter((c) => c === "O")).toHaveLength(1); // the computer already played
+    expect(game.board.filter((c) => c === "X")).toHaveLength(0);
+    expect(game.scores.O).toBe(1);
   });
 });

@@ -1,7 +1,7 @@
 // Sends the slash command list to Discord. Runs once and again whenever commands.js changes (npm run deploy)
 import "dotenv/config";
 import { REST, Routes } from "discord.js";
-import { commands } from "./commands.js";
+import { commands } from "../discord/commands.js";
 
 const { DISCORD_TOKEN, CLIENT_ID, GUILD_ID } = process.env;
 if (!DISCORD_TOKEN || !CLIENT_ID || !GUILD_ID) {

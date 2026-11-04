@@ -1,8 +1,8 @@
 // The real Discord objects. discord.js checks them as they are built (label length,
 // id length, five buttons per row...), so building them here catches mistakes early.
 import { describe, expect, it } from "vitest";
-import { COMPUTER, createGame } from "./game/game.js";
-import { createChallenge } from "./game/challenge.js";
+import { COMPUTER, createGame } from "../game/game.js";
+import { createChallenge } from "../game/challenge.js";
 import { toChallengeMessage, toClosedMessage, toMessage } from "./render.js";
 
 describe("toMessage", () => {
@@ -14,9 +14,10 @@ describe("toMessage", () => {
     expect(message.allowedMentions).toEqual({ parse: [] });
   });
 
-  it("is 3 rows of 3 buttons", () => {
-    expect(rows).toHaveLength(3);
-    for (const row of rows) {
+  it("is 3 rows of 3 squares, plus a controls row with one button", () => {
+    expect(rows).toHaveLength(4);
+    expect(rows[3].components.map((b) => b.label)).toEqual(["Resign"]);
+    for (const row of rows.slice(0, 3)) {
       expect(row.type).toBe(1); // an action row
       expect(row.components).toHaveLength(3);
       for (const button of row.components) expect(button.type).toBe(2); // a button
