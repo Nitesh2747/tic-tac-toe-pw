@@ -31,15 +31,27 @@ describe("moving between rooms", () => {
         expect(await roomNames()).toEqual(["Bob's room"]); // Alice's empty room is gone
     });
 
-    it("QUIRK: a refused join (room full) still takes you out of your old room", async () => {
+    it("keeps you in your old room when a join is refused because the room is full", async () => {
         const carol = await server.connect();
         await emitAck(carol, "room:create", profile("Carol")); // Carol is alone in her own room
         const { roomId: fullRoomId } = await seatTwoPlayers(server); // Alice and Bob fill another
         expect(await roomNames()).toEqual(["Alice's room", "Carol's room"]);
-
         const reply = await emitAck(carol, "room:join", { ...profile("Carol"), roomId: fullRoomId });
-
         expect(reply).toEqual({ ok: false, error: "Room is full" });
-        expect(await roomNames()).toEqual(["Alice's room"]); // Carol's room was deleted anyway
+        expect(await roomNames()).toEqual(["Alice's room", "Carol's room"]); // Carol's room survives
+        expect(await emitAck(carol, "game:move", { index: 0 })).toEqual({
+            ok: false,
+            error: "Waiting for an opponent",
+        });
+    });
+
+    it("still lets a player back into their own full room (a page refresh)", async () => {
+        const { alice, roomId } = await seatTwoPlayers(server); // the room is full
+        alice.disconnect();
+
+        const newAlice = await server.connect();
+        const reply = await emitAck(newAlice, "room:join", { ...profile("Alice"), roomId });
+
+        expect(reply).toMatchObject({ ok: true, role: "X" });
     });
 });

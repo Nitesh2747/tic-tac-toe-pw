@@ -104,7 +104,10 @@ export function registerRoomHandlers(io, socket) {
       return ack({ ok: false, error: "You were removed from this room" });
     }
 
-    // Only leave the old room once we know the new one is available.
+    // Check there is a seat BEFORE leaving the old room, so a refused join does not cost the player the room they are already in. (Someone who already has a seat here, like a player refreshing the page, always gets it back.)
+    if (!seated && room.players.X && room.players.O) {
+      return ack({ ok: false, error: "Room is full" });
+    }
     if (socket.data.roomId !== room.id) leaveCurrentRoom(io, socket);
 
     const wasSeated = getRoleOf(room, playerId) !== null;
@@ -118,7 +121,7 @@ export function registerRoomHandlers(io, socket) {
     socket.data.playerId = playerId;
     console.log(`room ${room.id}: ${role} = ${socket.id}`);
 
-    syncTurnTimer(io, room); 
+    syncTurnTimer(io, room);
     if (!wasSeated) {
       if (hadChat && room.chat.length === 0) socket.to(room.id).emit("chat:history", { messages: [] });
       socket.to(room.id).emit("chat:message", addSystemMessage(room, `${profile.name} joined.`));

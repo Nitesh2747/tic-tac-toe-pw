@@ -1,5 +1,7 @@
 # Tic Tac Toe Online
 
+[![Tests](https://github.com/Nitesh2747/tic-tac-toe-pw/actions/workflows/tests.yml/badge.svg)](https://github.com/Nitesh2747/tic-tac-toe-pw/actions/workflows/tests.yml)
+
 Real-time multiplayer Tic Tac Toe in the browser. Play in public or private rooms with usernames and avatars, a scoreboard, an optional turn timer and live chat, or play against the computer when nobody is around. Built with React, Express and Socket.IO.
 
 <!-- Live demo: add your link here -->
