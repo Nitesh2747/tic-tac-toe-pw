@@ -15,7 +15,7 @@ The board is nine buttons in a channel message. Click a square to play.
 - Only the two players can click, and only on their own turn. Anyone else gets a private message that only they can see.
 - **Resign** (under the board) gives the round to your opponent. After a round, **Play again** starts the next one on the same message. The score carries over and the other player starts.
 - A challenge can be declined by the challenged player or cancelled by the challenger.
-- A board or challenge nobody has touched for **10 minutes** is closed: the buttons are removed and the message says so.
+- A board or challenge nobody has touched for **5 minutes** is closed: the buttons are removed and the message says so.
 
 ## Setup
 
@@ -83,6 +83,14 @@ npm test
 ```
 
 The tests cover the game state, what is shown, the challenge flow, the idle timeout, and the click handling (with fake Discord interactions, so no network is needed). They run in GitHub Actions on every push and pull request, alongside the server and client tests.
+
+## Safety and limits
+
+- Only the **Guilds** intent is used, and the invite link needs no Administrator permission.
+- Messages never ping anyone except the person you challenge.
+- One person can have 3 games or challenges open at once, and must wait 3 seconds between starts. You can't send a second challenge to someone who hasn't answered the first. The bot holds at most 500 games in total.
+- Clicks are checked: only the players can use a board, only on their own turn, and a button's id is validated before use.
+- The bot token lives only in `.env` (ignored by git). If it is ever exposed, reset it in the Developer Portal.
 
 ## Known limits
 

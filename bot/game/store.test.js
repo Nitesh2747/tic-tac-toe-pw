@@ -57,3 +57,50 @@ describe("the store", () => {
     expect(store.takeExpired()).toHaveLength(1);
   });
 });
+
+describe("limits", () => {
+  const owned = (ownerId) => ({ channelId: "c", ownerId });
+
+  it("allows a person up to maxPerOwner open entries", () => {
+    const { store } = setup();
+    for (const id of ["a", "b", "c"]) store.set(id, { n: id }, owned("u1"));
+    expect(store.canStart("u1")).toEqual({
+      ok: false,
+      error: "You already have 3 games or challenges open. Finish or resign one first.",
+    });
+    expect(store.canStart("u2")).toEqual({ ok: true });
+  });
+
+  it("does not count entries that are no longer open", () => {
+    const clock = { time: 0 };
+    const store = createStore({ idleMs: 1000, now: () => clock.time, isOpen: (entry) => !entry.over });
+    store.set("a", { over: true }, owned("u1"));
+    store.set("b", { over: true }, owned("u1"));
+    store.set("c", { over: true }, owned("u1"));
+    expect(store.canStart("u1").ok).toBe(true);
+  });
+
+  it("refuses everybody once the total is reached", () => {
+    const store = createStore({ idleMs: 1000, maxTotal: 2 });
+    store.set("a", {}, owned("u1"));
+    store.set("b", {}, owned("u2"));
+    expect(store.canStart("u3").ok).toBe(false);
+  });
+
+  it("lets people start again once idle entries have been removed", () => {
+    const { store, clock } = setup();
+    for (const id of ["a", "b", "c"]) store.set(id, {}, owned("u1"));
+    clock.time = 2000;
+    store.takeExpired();
+    expect(store.canStart("u1").ok).toBe(true);
+  });
+
+  it("some() looks through the entries, and meta() reads what was stored with one", () => {
+    const { store } = setup();
+    store.set("a", { pending: true, challenger: "x" }, owned("x"));
+    expect(store.some((entry) => entry.challenger === "x")).toBe(true);
+    expect(store.some((entry) => entry.challenger === "y")).toBe(false);
+    expect(store.meta("a")).toEqual({ channelId: "c", ownerId: "x" });
+    expect(store.meta("nope")).toBeUndefined();
+  });
+});

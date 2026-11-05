@@ -1,9 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MessageFlags } from "discord.js";
 import { handleInteraction, parseMoveId } from "./interactions.js";
+import { createStore } from "../game/store.js";
+import { createCooldown } from "../game/cooldown.js";
+import { isOpenEntry } from "../game/challenge.js";
+
+// The same kind of store the bot uses, with a time limit nobody will reach in a test.
+const newStore = (options = {}) => createStore({ idleMs: 1e12, isOpen: isOpenEntry, ...options });
 
 // A fake interaction: just the few things handleInteraction touches.
-function fakeCommand({ userId = "u1", subcommand = "computer", level = null, opponent = { id: "u2", bot: false } } = {}) {
+function fakeCommand({ userId = "u1", subcommand = "computer", level = null, opponent = { id: "u2", bot: false }, messageId = "msg1" } = {}) {
   return {
     isChatInputCommand: () => true,
     isButton: () => false,
@@ -16,7 +22,7 @@ function fakeCommand({ userId = "u1", subcommand = "computer", level = null, opp
     },
     channelId: "chan1",
     reply: vi.fn().mockResolvedValue(undefined),
-    fetchReply: vi.fn().mockResolvedValue({ id: "msg1" }),
+    fetchReply: vi.fn().mockResolvedValue({ id: messageId }),
   };
 }
 function fakeClick({ userId = "u1", messageId = "msg1", customId }) {
@@ -47,7 +53,7 @@ describe("parseMoveId", () => {
 describe("/ttt computer", () => {
   let games;
   beforeEach(() => {
-    games = new Map();
+    games = newStore();
   });
 
   it("posts a board and remembers the game under the message id", async () => {
@@ -57,11 +63,9 @@ describe("/ttt computer", () => {
     expect(games.get("msg1")).toMatchObject({ players: { X: "u1", O: "computer" }, level: "medium" });
   });
 
-  it("stores the channel too, so an idle game can be closed later", async () => {
-    const stored = [];
-    const games = { get: () => undefined, set: (...args) => stored.push(args) };
+  it("stores the channel and the starter too, so an idle game can be closed later", async () => {
     await handleInteraction(fakeCommand(), games);
-    expect(stored[0][2]).toEqual({ channelId: "chan1" });
+    expect(games.meta("msg1")).toEqual({ channelId: "chan1", ownerId: "u1" });
   });
 
   it("uses the chosen level", async () => {
@@ -79,7 +83,7 @@ describe("/ttt computer", () => {
 describe("clicking a square", () => {
   let games;
   beforeEach(async () => {
-    games = new Map();
+    games = newStore();
     await handleInteraction(fakeCommand(), games);
   });
 
@@ -184,7 +188,7 @@ describe("clicking a square", () => {
 describe("/ttt challenge", () => {
   let games;
   beforeEach(() => {
-    games = new Map();
+    games = newStore();
   });
   const challenge = (options) => fakeCommand({ subcommand: "challenge", ...options });
 
@@ -210,7 +214,7 @@ describe("/ttt challenge", () => {
 describe("answering a challenge", () => {
   let games;
   beforeEach(async () => {
-    games = new Map();
+    games = newStore();
     await handleInteraction(fakeCommand({ subcommand: "challenge" }), games); // u1 challenges u2
   });
 
@@ -255,7 +259,7 @@ describe("answering a challenge", () => {
 
 describe("a game between two people", () => {
   it("only the player whose turn it is can move, and turns alternate", async () => {
-    const games = new Map();
+    const games = newStore();
     await handleInteraction(fakeCommand({ subcommand: "challenge" }), games);
     await handleInteraction(fakeClick({ userId: "u2", customId: "ttt:accept" }), games);
 
@@ -271,7 +275,7 @@ describe("a game between two people", () => {
   });
 
   it("a stray move click on a pending challenge is refused", async () => {
-    const games = new Map();
+    const games = newStore();
     await handleInteraction(fakeCommand({ subcommand: "challenge" }), games);
     const click = fakeClick({ userId: "u2", customId: "ttt:move:0" });
     await handleInteraction(click, games);
@@ -282,7 +286,7 @@ describe("a game between two people", () => {
 describe("Resign and Play again", () => {
   let games;
   beforeEach(async () => {
-    games = new Map();
+    games = newStore();
     await handleInteraction(fakeCommand({ subcommand: "challenge" }), games);
     await handleInteraction(fakeClick({ userId: "u2", customId: "ttt:accept" }), games); // u1 = X, u2 = O
   });
@@ -338,7 +342,7 @@ describe("Resign and Play again", () => {
 
 describe("rematch against the computer", () => {
   it("the computer opens the next round when it is its turn to start", async () => {
-    const games = new Map();
+    const games = newStore();
     await handleInteraction(fakeCommand(), games);
     await handleInteraction(fakeClick({ customId: "ttt:resign" }), games);
     await handleInteraction(fakeClick({ customId: "ttt:rematch" }), games);
@@ -346,5 +350,100 @@ describe("rematch against the computer", () => {
     expect(game.board.filter((c) => c === "O")).toHaveLength(1); // the computer already played
     expect(game.board.filter((c) => c === "X")).toHaveLength(0);
     expect(game.scores.O).toBe(1);
+  });
+});
+
+describe("limits on starting games", () => {
+  const start = (games, options = {}, cooldown) => handleInteraction(fakeCommand(options), games, cooldown);
+  const refusalOf = (command) => command.reply.mock.calls[0][0];
+
+  it("one person may have only 3 games or challenges open", async () => {
+    const games = newStore();
+    for (const id of ["m1", "m2", "m3"]) await start(games, { messageId: id });
+
+    const fourth = fakeCommand({ messageId: "m4" });
+    await handleInteraction(fourth, games);
+
+    expect(refusalOf(fourth)).toEqual({
+      content: "You already have 3 games or challenges open. Finish or resign one first.",
+      flags: MessageFlags.Ephemeral,
+    });
+    expect(games.has("m4")).toBe(false);
+  });
+
+  it("a finished game no longer counts", async () => {
+    const games = newStore();
+    for (const id of ["m1", "m2", "m3"]) await start(games, { messageId: id });
+    await handleInteraction(fakeClick({ messageId: "m1", customId: "ttt:resign" }), games);
+
+    await start(games, { messageId: "m4" });
+    expect(games.has("m4")).toBe(true);
+  });
+
+  it("other people are not affected by someone else's games", async () => {
+    const games = newStore();
+    for (const id of ["m1", "m2", "m3"]) await start(games, { messageId: id });
+    await start(games, { userId: "u9", messageId: "m9" });
+    expect(games.has("m9")).toBe(true);
+  });
+
+  it("the bot stops accepting new games when it holds too many in total", async () => {
+    const games = newStore({ maxTotal: 2 });
+    await start(games, { userId: "a", messageId: "m1" });
+    await start(games, { userId: "b", messageId: "m2" });
+
+    const third = fakeCommand({ userId: "c", messageId: "m3" });
+    await handleInteraction(third, games);
+    expect(refusalOf(third).content).toContain("busy right now");
+    expect(games.size).toBe(2);
+  });
+
+  it("a person must wait between starts", async () => {
+    const clock = { time: 0 };
+    const cooldown = createCooldown({ ms: 3000, now: () => clock.time });
+    const games = newStore();
+    await start(games, { messageId: "m1" }, cooldown);
+
+    clock.time = 1000;
+    const tooSoon = fakeCommand({ messageId: "m2" });
+    await handleInteraction(tooSoon, games, cooldown);
+    expect(refusalOf(tooSoon).content).toBe("Slow down! Try again in 2 seconds.");
+    expect(games.has("m2")).toBe(false);
+
+    clock.time = 3000;
+    await start(games, { messageId: "m3" }, cooldown);
+    expect(games.has("m3")).toBe(true);
+  });
+
+  it("the wait does not apply to clicking squares", async () => {
+    const clock = { time: 0 };
+    const cooldown = createCooldown({ ms: 3000, now: () => clock.time });
+    const games = newStore();
+    await start(games, { messageId: "msg1" }, cooldown);
+    const click = fakeClick({ customId: "ttt:move:4" });
+    await handleInteraction(click, games, cooldown);
+    expect(click.update).toHaveBeenCalledOnce();
+  });
+
+  it("you cannot pile challenges on the same person", async () => {
+    const games = newStore();
+    await start(games, { subcommand: "challenge", messageId: "m1" });
+
+    const again = fakeCommand({ subcommand: "challenge", messageId: "m2" });
+    await handleInteraction(again, games);
+    expect(refusalOf(again).content).toBe("You already have a challenge waiting for them.");
+    expect(games.has("m2")).toBe(false);
+
+    // once they answer, a new challenge is fine
+    await handleInteraction(fakeClick({ userId: "u2", messageId: "m1", customId: "ttt:decline" }), games);
+    await start(games, { subcommand: "challenge", messageId: "m3" });
+    expect(games.has("m3")).toBe(true);
+  });
+
+  it("but you can challenge two different people", async () => {
+    const games = newStore();
+    await start(games, { subcommand: "challenge", messageId: "m1", opponent: { id: "u2", bot: false } });
+    await start(games, { subcommand: "challenge", messageId: "m2", opponent: { id: "u3", bot: false } });
+    expect(games.has("m2")).toBe(true);
   });
 });

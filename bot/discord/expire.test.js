@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { closeIdleGames } from "./expire.js";
+import { IDLE_MINUTES, closeIdleGames } from "./expire.js";
 import { createStore } from "../game/store.js";
 import { createGame } from "../game/game.js";
 import { createChallenge } from "../game/challenge.js";
@@ -25,7 +25,7 @@ describe("closeIdleGames", () => {
     expect(id).toBe("m1");
     expect(payload.components).toEqual([]);
     expect(payload.content).toContain("<@a>");
-    expect(payload.content).toContain("Closed after 10 minutes");
+    expect(payload.content).toContain(`Closed after ${IDLE_MINUTES} minutes`);
     expect(store.has("m1")).toBe(false);
   });
 

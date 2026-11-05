@@ -1,0 +1,36 @@
+# Checks the installed packages against the list of known security problems.
+# It is separate from tests.yml on purpose: a newly published advisory can turn this red
+# without any change of yours, and that should not make your tests badge fail.
+name: Security audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 3 * * 1" # every Monday, so new advisories are noticed even when nobody pushes
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Audit ${{ matrix.folder }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false # check all three, even if one fails
+      matrix:
+        folder: [server, client, bot]
+    defaults:
+      run:
+        working-directory: ${{ matrix.folder }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22.14.0
+
+      # Only the packages that run in production (not the test tools), and only
+      # problems rated high or critical.
+      - run: npm audit --omit=dev --audit-level=high

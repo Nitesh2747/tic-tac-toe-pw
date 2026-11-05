@@ -26,11 +26,14 @@ import {
   CODE_FAIL_WINDOW_MS,
   CODE_FAILS_PER_SOCKET,
   CODE_FAILS_PER_IP,
+  ROOM_CREATES_PER_IP,
+  ROOM_CREATE_WINDOW_MS,
 } from "../config.js";
 
 // Wrong private-room codes are limited per connection AND per IP address, so guessing codes is hopeless. A room itself is never locked, because that would let anyone lock a host's guests out just by spamming wrong codes.
 const socketLimiter = createFailureLimiter({ limit: CODE_FAILS_PER_SOCKET, windowMs: CODE_FAIL_WINDOW_MS });
 const ipLimiter = createFailureLimiter({ limit: CODE_FAILS_PER_IP, windowMs: CODE_FAIL_WINDOW_MS });
+const createLimiter = createFailureLimiter({ limit: ROOM_CREATES_PER_IP, windowMs: ROOM_CREATE_WINDOW_MS });
 
 // The secret code goes only to the people sitting in a private room.
 function codeFor(room) {
@@ -46,6 +49,13 @@ export function registerRoomHandlers(io, socket) {
     if (!profile.ok) return ack(profile);
     const settings = readRoomSettings(payload, profile.name);
     if (!settings.ok) return ack(settings);
+
+    const ip = getClientIp(socket);
+    const waitMs = createLimiter.retryAfterMs(ip);
+    if (waitMs > 0) {
+      return ack({ ok: false, error: `You are creating rooms too fast. Try again in ${Math.ceil(waitMs / 1000)} seconds` });
+    }
+    createLimiter.recordFailure(ip);
 
     leaveCurrentRoom(io, socket);
 

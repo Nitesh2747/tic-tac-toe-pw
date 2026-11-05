@@ -290,6 +290,11 @@ Open <http://localhost:5173>, pick a name, and create a room.
 | `CODE_FAILS_PER_IP` | `30` | Wrong codes one IP address may try per window. |
 | `CHAT_MAX_MESSAGES` | `5` | Chat messages one player may send per window. |
 | `CHAT_WINDOW_MS` | `5000` | The chat limit's window. |
+| `MAX_CONNECTIONS_PER_IP` | `20` | Connections one IP address may hold open at once. |
+| `EVENT_LIMIT` | `40` | Events one connection may send per window. Over the limit, requests are refused, and a connection that keeps flooding is dropped. |
+| `EVENT_WINDOW_MS` | `5000` | The event limit's window. |
+| `ROOM_CREATES_PER_IP` | `10` | Rooms one IP address may create per window. |
+| `ROOM_CREATE_WINDOW_MS` | `60000` | The room-creation limit's window. |
 | `TURN_SECOND_MS` | `1000` | How long one "second" of the turn timer lasts. **For tests only**, so a 15 second timer can run in under a second. Leave it alone. |
 
 **Client** (`client/.env`, see [`client/.env.example`](client/.env.example))
@@ -311,9 +316,9 @@ Open <http://localhost:5173>, pick a name, and create a room.
 ## Tests
 
 ```bash
-cd server && npm test    # 245 tests (unit + socket integration)
+cd server && npm test    # 270 tests (unit + socket integration)
 cd client && npm test    # 120 tests
-cd bot && npm test       # 86 tests
+cd bot && npm test       # 106 tests
 ```
 
 The tests are plain unit tests (Vitest) and run in a couple of seconds.
@@ -347,7 +352,10 @@ The client is a static site and the server is one long-running Node process.
 - Private codes are 6 characters from a 32-character alphabet, generated with `crypto.randomInt`. Guessing is limited per connection and per IP address, checked before the code is looked at, and the code changes when a player is removed.
 - Chat is plain text only, cleaned on the server, rendered by React as text, and rate limited. The sender is always taken from the server's own record.
 - Messages over 10 KB are refused, and memory is bounded (rooms, lobby entries, chat history and rate-limit tables are all capped).
-- Cross-origin access is limited to `CLIENT_ORIGIN`.
+- Browsers from other websites are refused at the socket handshake: only the origins in `CLIENT_ORIGIN` may connect. (Programs that send no Origin header are not blocked, so this is a browser-level guard, not a password.)
+- Abuse limits: connections per IP address, events per connection and rooms created per IP address are all capped, and a connection that keeps flooding is dropped. A handler that throws is logged and answered with an error instead of stopping the server.
+- The website is served with a Content-Security-Policy (no inline scripts), `Referrer-Policy: no-referrer` and other headers, set in `client/vercel.json`. The policy allows connections to any `https:` or `wss:` address. Once your server's real URL is known, you can tighten `connect-src` to just that address.
+- Dependencies are checked weekly by GitHub Actions (`npm audit`) and updated through Dependabot pull requests.
 
 ## Known limitations
 

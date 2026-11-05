@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { acceptChallenge, closeChallenge, createChallenge, describeChallenge } from "./challenge.js";
+import { acceptChallenge, closeChallenge, createChallenge, describeChallenge, isOpenEntry } from "./challenge.js";
+import { resign } from "./game.js";
 
 const challenge = () => createChallenge({ challenger: "a", opponent: "b" });
 
@@ -31,5 +32,15 @@ describe("challenges", () => {
     expect(content).toContain("<@a>");
     expect(content).toContain("<@b>");
     expect(buttons.map((b) => b.label)).toEqual(["Accept", "Decline"]);
+  });
+});
+
+describe("isOpenEntry", () => {
+  it("a waiting challenge and a running game are open; a finished round is not", () => {
+    const pending = challenge();
+    const game = acceptChallenge(pending, "b").game;
+    expect(isOpenEntry(pending)).toBe(true);
+    expect(isOpenEntry(game)).toBe(true);
+    expect(isOpenEntry(resign(game, "a").game)).toBe(false);
   });
 });

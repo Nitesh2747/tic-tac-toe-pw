@@ -4,6 +4,8 @@ import { Client, Events, GatewayIntentBits } from "discord.js";
 import { handleInteraction } from "./discord/interactions.js";
 import { IDLE_MINUTES, closeIdleGames } from "./discord/expire.js";
 import { createStore } from "./game/store.js";
+import { createCooldown } from "./game/cooldown.js";
+import { isOpenEntry } from "./game/challenge.js";
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
@@ -11,10 +13,17 @@ if (!token) {
   process.exit(1);
 }
 
-// "Intents" say which kinds of events the bot wants to hear about. Guilds/Servers is the minimum, and slash commands and buttons need nothing more.
+// "Intents" say which kinds of events the bot wants to hear about. Guilds (Discord's
+// word for servers) is the minimum, and slash commands and buttons need nothing more.
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
-const games = createStore({ idleMs: IDLE_MINUTES * 60_000 });
+// The games in progress, by the id of the Discord message that shows them. A game
+// nobody has touched for IDLE_MINUTES is closed. They live in memory only, so a
+// restart forgets them (like the website's rooms).
+const games = createStore({ idleMs: IDLE_MINUTES * 60_000, isOpen: isOpenEntry });
+
+// Each person may start a game or challenge only once every few seconds.
+const cooldown = createCooldown({ ms: 3000 });
 
 // Runs once, when the bot has connected and is ready.
 client.once(Events.ClientReady, (readyClient) => {
@@ -24,7 +33,7 @@ client.once(Events.ClientReady, (readyClient) => {
 });
 
 // Runs every time someone uses a slash command or clicks a button.
-client.on(Events.InteractionCreate, (interaction) => handleInteraction(interaction, games));
+client.on(Events.InteractionCreate, (interaction) => handleInteraction(interaction, games, cooldown));
 
 // Without these, one unlucky network error could crash the whole bot.
 client.on(Events.Error, (error) => console.error("Discord client error:", error));

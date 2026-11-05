@@ -1,6 +1,6 @@
 // A challenge: "A asks B to play". Pure data and rules, no Discord code in here.
 // It lives until B accepts (it becomes a game), or B declines, or A cancels.
-import { createGame } from "./game.js";
+import { createGame, getResult } from "./game.js";
 
 export const ACCEPT_ID = "ttt:accept";
 export const DECLINE_ID = "ttt:decline";
@@ -37,4 +37,10 @@ export function describeChallenge(challenge) {
       { customId: DECLINE_ID, label: "Decline", style: "danger", disabled: false },
     ],
   };
+}
+
+// Does this stored thing (a challenge or a game) still count as "open" for a person's
+// limit? A challenge waiting for an answer does; a game does until its round is over.
+export function isOpenEntry(entry) {
+  return Boolean(entry.pending) || !getResult(entry).over;
 }
