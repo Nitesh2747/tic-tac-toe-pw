@@ -48,3 +48,21 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build # also check that the site still builds
+  
+  bot:
+    name: Bot tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bot
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22.14.0
+          cache: npm
+          cache-dependency-path: bot/package-lock.json
+
+      - run: npm ci
+      - run: npm test # also checks that the bot's logic.js matches the server's and client's copies

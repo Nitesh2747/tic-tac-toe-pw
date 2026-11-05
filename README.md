@@ -10,9 +10,9 @@ Real-time multiplayer Tic Tac Toe in the browser. Play in public or private room
   <img src="screenshots/04-playing.png" width="760" alt="A timed game in progress: the board, scoreboard and turn countdown next to the chat panel">
 </p>
 
-**Contents:** [Features](#features) · [A tour](#a-tour) · [How it works](#how-it-works) · [The protocol](#the-protocol) · [Project structure](#project-structure) · [Getting started](#getting-started) · [Configuration](#configuration) · [Tests](#tests) · [Deploying](#deploying) · [Security notes](#security-notes) · [Known limitations](#known-limitations) · [What's next](#whats-next)
+**Contents:** [Features](#features) · [A tour](#a-tour) · [How it works](#how-it-works) · [The protocol](#the-protocol) · [Project structure](#project-structure) · [Getting started](#getting-started) · [Configuration](#configuration) · [Tests](#tests) · [Discord bot](#discord-bot) · [Deploying](#deploying) · [Security notes](#security-notes) · [Known limitations](#known-limitations) · [What's next](#whats-next)
 
-The code is split into two small apps, each with its own README: [`client/`](client/README.md) (the React front end) and [`server/`](server/README.md) (the Express and Socket.IO back end).
+The code is split into three small apps, each with its own README: [`client/`](client/README.md) (the React front end), [`server/`](server/README.md) (the Express and Socket.IO back end) and [`bot/`](bot/README.md) (a Discord bot that plays the same game).
 
 ## Features
 
@@ -222,8 +222,7 @@ All client-to-server events take an acknowledgement callback and answer `{ ok: t
 │       │   ├── viewport.js          keyboard-aware sizing for the chat sheet
 │       │   ├── avatar.js, profile.js, invite.js, savedRoom.js, playerId.js, clipboard.js
 │       │   └── socket.js            the one Socket.IO connection
-│       └── hooks/                useTheme, useLobbyRooms, useProfile, useCountdown,
-│                                 useMediaQuery, useVisualViewport
+│       └── hooks/                useTheme, useLobbyRooms, useProfile, useCountdown, useMediaQuery, useVisualViewport
 ├── server/                       Express + Socket.IO back end
 │   ├── index.js                  HTTP server, CORS, /health, graceful shutdown
 │   ├── config.js                 every setting, read from the environment in one place
@@ -243,6 +242,11 @@ All client-to-server events take an acknowledgement callback and answer `{ ok: t
 │       ├── rateLimit.js          sliding-window limits (wrong codes, chat)
 │       ├── profile.js, validate.js   checking what browsers send
 │       └── clientIp.js           finding a client's address, proxy-aware
+├── bot/                          Discord bot (discord.js)
+│   ├── index.js                  connects to Discord, closes idle boards
+│   ├── scripts/deploy-commands.js   registers the /ttt slash command
+│   ├── discord/                  commands, click handling, buttons, idle timeout
+│   └── game/                     rules, game state, challenges (no Discord in here)
 └── screenshots/             the images in this README
 ```
 
@@ -307,8 +311,9 @@ Open <http://localhost:5173>, pick a name, and create a room.
 ## Tests
 
 ```bash
-cd server && npm test    # 194 tests
+cd server && npm test    # 245 tests (unit + socket integration)
 cd client && npm test    # 120 tests
+cd bot && npm test       # 86 tests
 ```
 
 The tests are plain unit tests (Vitest) and run in a couple of seconds.
@@ -318,7 +323,11 @@ The tests are plain unit tests (Vitest) and run in a couple of seconds.
 - **Safety.** Public state and the lobby list are checked to never contain a player ID or private code, and bad input (names, room names, timer settings, chat text, move positions) is checked to be refused.
 - **Client helpers.** Avatars, name rules, invite links, saved rooms, the win line, offline game state, the countdown and keyboard sizing.
 
-The socket events and the screens themselves are not covered by automated tests in this repository. They were checked with separate end-to-end scripts that are not part of the project, which is listed under [What's next](#whats-next).
+The server's socket events are covered by integration tests (a real server and real socket clients, in `server/integration/`), and the bot's click handling by tests with fake Discord interactions. All three suites run on every push in GitHub Actions. The React screens are not covered by browser-level tests yet, which is listed under [What's next](#whats-next).
+
+## Discord bot
+
+The same game is also a Discord bot: play in a channel with buttons, challenge another member (`/ttt challenge @someone`) or play the computer (`/ttt computer`). It reuses this project's game rules and computer opponent. Setup, commands and the code layout are in [`bot/README.md`](bot/README.md).
 
 ## Deploying
 
@@ -353,6 +362,6 @@ The client is a static site and the server is one long-running Node process.
 
 ## What's next
 
-- **A Discord bot** that plays the same game, reusing the rules and the computer opponent in `logic.js`.
+- **Hosting the Discord bot** on an always-on host, and optionally linking it to the website's rooms.
 - **Spectators** (the lobby already hides full rooms, so there is room to add a "Watch" button).
 - **Moderation and persistence:** reporting or muting in public rooms, and optional storage so rooms survive a restart.
