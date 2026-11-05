@@ -19,7 +19,7 @@ jobs:
       run:
         working-directory: server # every "run" step below happens inside server/
     steps:
-      - uses: actions/checkout@v5 # download the repo's code onto the machine
+      - uses: actions/checkout@v7 # download the repo's code onto the machine
 
       - uses: actions/setup-node@v5 # install Node, the same version you use locally
         with:
@@ -37,7 +37,7 @@ jobs:
       run:
         working-directory: client
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v5
         with:
@@ -56,7 +56,7 @@ jobs:
       run:
         working-directory: bot
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v5
         with:
