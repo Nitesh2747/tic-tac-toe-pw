@@ -4,7 +4,9 @@
 
 Real-time multiplayer Tic Tac Toe in the browser. Play in public or private rooms with usernames and avatars, a scoreboard, an optional turn timer and live chat, or play against the computer when nobody is around. Built with React, Express and Socket.IO.
 
-<!-- Live demo: add your link here -->
+**▶ Live website link: [Tic Tac Toe](https://tic-tac-toe-pw.vercel.app)**
+
+> The server runs on Render's free plan, which sleeps when idle. The first visit after a quiet spell can take up to a minute to wake up, so if the lobby says it's connecting, give it a moment.
 
 <p align="center">
   <img src="screenshots/04-playing.png" width="760" alt="A timed game in progress: the board, scoreboard and turn countdown next to the chat panel">
@@ -334,7 +336,16 @@ The server's socket events are covered by integration tests (a real server and r
 
 The same game is also a Discord bot: play in a channel with buttons, challenge another member (`/ttt challenge @someone`) or play the computer (`/ttt computer`). It reuses this project's game rules and computer opponent. Setup, commands and the code layout are in [`bot/README.md`](bot/README.md).
 
+> The bot is not hosted currently on a service and runs itself locally on the machine; do it yourself with the steps in [`bot/README.md`](bot/README.md).
+
 ## Deploying
+
+The live website runs like this:
+
+| Part | Host | Settings |
+|---|---|---|
+| Website (`client/`) | Vercel | Root directory `client`; `VITE_SERVER_URL` = the Render address |
+| Server (`server/`) | Render (free web service) | Root directory `server`; build `npm ci`; start `npm start`; health check `/health`; `NODE_VERSION=22.14.0`, `TRUST_PROXY=true`, `CLIENT_ORIGIN` = the Vercel address |
 
 The client is a static site and the server is one long-running Node process.
 
@@ -354,7 +365,7 @@ The client is a static site and the server is one long-running Node process.
 - Messages over 10 KB are refused, and memory is bounded (rooms, lobby entries, chat history and rate-limit tables are all capped).
 - Browsers from other websites are refused at the socket handshake: only the origins in `CLIENT_ORIGIN` may connect. (Programs that send no Origin header are not blocked, so this is a browser-level guard, not a password.)
 - Abuse limits: connections per IP address, events per connection and rooms created per IP address are all capped, and a connection that keeps flooding is dropped. A handler that throws is logged and answered with an error instead of stopping the server.
-- The website is served with a Content-Security-Policy (no inline scripts), `Referrer-Policy: no-referrer` and other headers, set in `client/vercel.json`. The policy allows connections to any `https:` or `wss:` address. Once your server's real URL is known, you can tighten `connect-src` to just that address.
+- The website is served with a Content-Security-Policy (no inline scripts, and the page may only connect to its own server), `Referrer-Policy: no-referrer` and other headers, set in `client/vercel.json`.
 - Dependencies are checked weekly by GitHub Actions (`npm audit`) and updated through Dependabot pull requests.
 
 ## Known limitations
